@@ -37,6 +37,6 @@ COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 
 EXPOSE 3000
 
-# Next.js standalone 的 server.js 位于 standalone 根目录（实测镜像内为 /app/server.js），
-# 而非 apps/web/server.js（2026-10-24 服务器实测：原路径 MODULE_NOT_FOUND 导致 web 重启循环）
-CMD ["node", "server.js"]
+# outputFileTracingRoot 定为工作区根后，standalone 按工作区层级还原：
+# 入口为 apps/web/server.js，依赖在 /app/node_modules（2026-10-24 服务器实测修正）
+CMD ["node", "apps/web/server.js"]
