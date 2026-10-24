@@ -83,11 +83,13 @@ def find_block(text, start):
                 return start, j + 1
     raise ValueError("unbalanced braces")
 
-# 找到含 blog server_name 的 server 块
+# 找到 blog 的 HTTPS server 块（必须同时含 server_name 与 listen 443，
+# 避免误改同文件里的 80 端口 301 跳转块）
 m = None
 for cand in re.finditer(r"server\s*\{", src):
     s, e = find_block(src, cand.start())
-    if "blog.ulife.vip" in src[s:e] and "server_name" in src[s:e]:
+    blk = src[s:e]
+    if "blog.ulife.vip" in blk and "server_name" in blk and re.search(r"listen\s+443", blk):
         m = (s, e)
         break
 if not m:
