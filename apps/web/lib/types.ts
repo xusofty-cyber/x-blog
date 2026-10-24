@@ -45,6 +45,7 @@ export interface Post {
   tags?: Tag[];
   createdAt: string;
   updatedAt: string;
+  viewCount: number;
 }
 
 export interface PaginatedResponse<T> {

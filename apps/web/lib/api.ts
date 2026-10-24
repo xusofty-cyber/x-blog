@@ -68,6 +68,28 @@ export async function getPostBySlug(slug: string): Promise<Post | null> {
 }
 
 /**
+ * 文章访问量 +1（失败时静默，绝不阻断页面渲染）
+ * 注意：只在文章页正文渲染时调用，不要在 generateMetadata 里调用，否则一次访问会重复计数
+ */
+export async function incrementPostView(slug: string): Promise<void> {
+  if (!slug) return;
+  try {
+    await fetch(`${API_BASE_URL}/api/posts/${encodeURIComponent(slug)}/view`, {
+      method: 'POST',
+      cache: 'no-store',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  } catch (err) {
+    console.warn(
+      `[API Server] increment view failed for ${slug}:`,
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
+/**
  * 获取全部全部分类
  */
 export async function getCategories(): Promise<Category[]> {

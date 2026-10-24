@@ -30,6 +30,11 @@ export class PostsController {
     return this.postsService.findBySlug(slug);
   }
 
+  @Post(':slug/view')
+  async incrementView(@Param('slug') slug: string) {
+    return this.postsService.incrementViewCount(slug);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post()
   async create(@Body() createPostDto: CreatePostDto, @CurrentUser() user: any) {

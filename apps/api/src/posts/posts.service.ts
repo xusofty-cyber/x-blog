@@ -86,6 +86,25 @@ export class PostsService {
     return post;
   }
 
+  async incrementViewCount(slug: string) {
+    const post = await this.prisma.post.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+
+    if (!post) {
+      throw new NotFoundException(`文章不存在: ${slug}`);
+    }
+
+    const updated = await this.prisma.post.update({
+      where: { id: post.id },
+      data: { viewCount: { increment: 1 } },
+      select: { viewCount: true },
+    });
+
+    return updated;
+  }
+
   async findAdminPosts(query: QueryPostDto) {
     const page = Math.max(1, query.page || 1);
     const pageSize = Math.max(1, query.pageSize || 10);

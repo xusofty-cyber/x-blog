@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Calendar, Clock, User, Tag as TagIcon } from 'lucide-react';
-import { getPostBySlug, getPosts } from '@/lib/api';
+import { getPostBySlug, getPosts, incrementPostView } from '@/lib/api';
 import { renderMarkdown } from '@/lib/markdown';
 import ReadingProgress from '@/components/ReadingProgress';
 
@@ -51,7 +51,10 @@ export default async function PostPage({ params }: PostPageProps) {
     notFound();
   }
 
-  const htmlContent = await renderMarkdown(post.content);
+  const [, htmlContent] = await Promise.all([
+    incrementPostView(slug),
+    renderMarkdown(post.content),
+  ]);
   const formattedDate = post.publishedAt
     ? new Date(post.publishedAt).toLocaleDateString('zh-CN', {
         year: 'numeric',

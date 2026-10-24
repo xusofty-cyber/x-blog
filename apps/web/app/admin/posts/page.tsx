@@ -193,6 +193,9 @@ export default function AdminPostsPage() {
               <th scope="col" className="px-6 py-3.5">
                 状态
               </th>
+              <th scope="col" className="px-6 py-3.5 text-right">
+                访问量
+              </th>
               <th scope="col" className="px-6 py-3.5">
                 创建 / 发布时间
               </th>
@@ -204,13 +207,13 @@ export default function AdminPostsPage() {
           <tbody className="divide-y divide-border bg-card">
             {isLoading ? (
               <tr>
-                <td colSpan={5} className="py-12 text-center text-muted-foreground">
+                <td colSpan={6} className="py-12 text-center text-muted-foreground">
                   加载文章中...
                 </td>
               </tr>
             ) : posts.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-12 text-center text-muted-foreground">
+                <td colSpan={6} className="py-12 text-center text-muted-foreground">
                   暂无匹配的文章记录
                 </td>
               </tr>
@@ -258,6 +261,10 @@ export default function AdminPostsPage() {
                     >
                       ● {post.status === 'PUBLISHED' ? '已发布' : '草稿'}
                     </button>
+                  </td>
+
+                  <td className="px-6 py-4 text-right text-sm font-semibold text-foreground tabular-nums whitespace-nowrap">
+                    {(post.viewCount ?? 0).toLocaleString('zh-CN')}
                   </td>
 
                   <td className="px-6 py-4 text-xs text-muted-foreground whitespace-nowrap">
