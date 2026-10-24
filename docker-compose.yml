@@ -10,6 +10,8 @@ services:
       - pgnet
     env_file:
       - .env
+    volumes:
+      - /var/www/blog-img:/data/blog-img
     command: ["/bin/sh", "/app/apps/api/docker-entrypoint.sh"]
     restart: unless-stopped
 

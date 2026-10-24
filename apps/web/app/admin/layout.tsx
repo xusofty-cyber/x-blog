@@ -59,6 +59,7 @@ export default function AdminLayout({
   const navItems = [
     { label: '仪表盘概览', href: '/admin', exact: true },
     { label: '文章管理', href: '/admin/posts', exact: false },
+    { label: '媒体库', href: '/admin/media', exact: false },
     { label: '分类管理', href: '/admin/categories', exact: false },
     { label: '标签管理', href: '/admin/tags', exact: false },
   ];
