@@ -1,9 +1,14 @@
 import { PrismaClient, PostStatus } from '@prisma/client';
-import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
+  // bcryptjs 是 CJS 模块：ts-node 以 ESM 加载 seed 时 `import * as bcrypt`
+  // 拿不到 hash（cjs-module-lexer 无法静态识别其动态导出），改动态导入并
+  // 兼容 default 与命名空间两种形态（2026-10-24 服务器实测：hash is not a function）
+  const bcrypt = await import('bcryptjs').then(
+    (m) => (m as unknown as { default?: typeof import('bcryptjs') }).default ?? m,
+  );
   const adminEmail = process.env.SEED_ADMIN_EMAIL?.trim();
   const adminPassword = process.env.SEED_ADMIN_PASSWORD?.trim();
 
