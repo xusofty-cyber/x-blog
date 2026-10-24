@@ -1,0 +1,34 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    expose:
+      - "4000"
+    networks:
+      - default
+      - pgnet
+    env_file:
+      - .env
+    command: ["/bin/sh", "/app/apps/api/docker-entrypoint.sh"]
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "127.0.0.1:13100:3000"
+    environment:
+      - API_INTERNAL_URL=http://api:4000
+    depends_on:
+      - api
+    networks:
+      - default
+    restart: unless-stopped
+
+networks:
+  default:
+  pgnet:
+    external: true
+    name: nexasx-internal
