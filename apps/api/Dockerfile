@@ -25,6 +25,9 @@ RUN npm run build
 
 # Stage 3: Runner
 FROM node:22-alpine AS runner
+# Prisma 引擎在 musl/Alpine 上需要 OpenSSL 共享库；缺失时 migrate 会以
+# "Could not parse schema engine response" 崩溃重启（2026-10-24 服务器实测）
+RUN apk add --no-cache openssl
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4000
