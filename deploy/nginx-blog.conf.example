@@ -1,0 +1,65 @@
+# 示例，需服务器上按现有证书路径调整后才生效
+#
+# X-Blog Nginx 反向代理配置示例
+# 域名: blog.ulife.vip
+# 上游: 宿主机 127.0.0.1:13100 (Docker Compose 映射的 Next.js web 服务)
+
+# 80 端口 HTTP 强制重定向至 HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name blog.ulife.vip;
+
+    return 301 https://$host$request_uri;
+}
+
+# 443 端口 HTTPS 代理服务
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name blog.ulife.vip;
+
+    # SSL 证书与私钥路径（请替换为您服务器上的实际证书路径）
+    ssl_certificate /etc/nginx/ssl/blog.ulife.vip/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/blog.ulife.vip/privkey.pem;
+
+    # SSL 协议与加密套件配置
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    # 允许的最大上传客户端体积（支持图片附件上传）
+    client_max_body_size 10m;
+
+    # 反向代理到本地 Next.js 服务容器
+    location / {
+        proxy_pass http://127.0.0.1:13100;
+
+        # 常规代理头四项
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # WebSocket 支持与长连接保持
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        # 超时配置
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    # 静态缓存优化（由 Next.js _next/static 自带 hash 缓存控制）
+    location /_next/static/ {
+        proxy_pass http://127.0.0.1:13100;
+        proxy_set_header Host $host;
+        expires 365d;
+        access_log off;
+    }
+}
