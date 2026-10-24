@@ -1,5 +1,9 @@
 generator client {
   provider = "prisma-client-js"
+  // 部署镜像为 Alpine + OpenSSL 3.x：生成时必须固定该引擎变体，否则构建期
+  // （无 openssl）会生成 linux-musl 通用引擎，运行期检测到 openssl-3.0.x 后
+  // 找不到对应引擎文件、PrismaService 判定数据库不可达（2026-10-24 服务器实测）
+  binaryTargets = ["linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
