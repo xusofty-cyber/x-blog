@@ -21,6 +21,10 @@ COPY package.json ./
 COPY apps/web ./apps/web
 WORKDIR /app/apps/web
 ENV NEXT_TELEMETRY_DISABLED=1
+# next.config 的 rewrites 在构建期求值并烘焙进产物：构建期若无此变量会烘焙
+# localhost:4000，容器内代理必然 500（2026-10-24 服务器实测：直连 api 正常、
+# 经 13100 代理恒为 Internal Server Error）。构建期即按容器内主机名写死。
+ENV API_INTERNAL_URL=http://api:4000
 RUN npm run build
 
 # Stage 3: 生产运行时镜像
