@@ -24,8 +24,10 @@ docker run --rm \
   postgres:16-alpine \
   sh -c '
     set -e
-    # Extract maintenance connection string by replacing database name with /postgres
-    ADMIN_URL=$(echo "$DATABASE_URL" | sed -E "s|/[^/?]+(\?.*)?$|/postgres\1|")
+    # Extract maintenance connection string: replace database name with /postgres
+    # and DROP the query string entirely (?schema=public is a Prisma-only parameter
+    # that libpq/psql rejects with "invalid URI query parameter")
+    ADMIN_URL=$(echo "$DATABASE_URL" | sed -E "s|/[^/?]+(\?.*)?$|/postgres|")
     
     echo "Connecting to PostgreSQL to check database existence..."
     DB_EXISTS=$(psql "$ADMIN_URL" -tAc "SELECT 1 FROM pg_database WHERE datname='\''x_blog'\''")
