@@ -1,0 +1,63 @@
+name: Deploy x-blog
+
+# 部署通道：GitHub 托管 Runner 通过 SSH 登录服务器，在服务器上拉取 main 并执行 deploy/deploy.sh。
+# 服务器地址与登录用户不是秘密，直接写在 env 中；只有密码类信息走 GitHub Secrets：
+#   - SERVER_PASSWORD：服务器 ubuntu 的 SSH 登录密码
+#   - BLOG_ENV：博客 .env 的完整多行内容（格式见 deploy/GITHUB_ACTIONS_SETUP.md）
+# 本工作流不触碰服务器上除 ~/x-blog 与本项目容器之外的任何服务/容器。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  SERVER_HOST: 154.8.219.189
+  SERVER_USER: ubuntu
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check required secrets exist
+        env:
+          SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+          BLOG_ENV: ${{ secrets.BLOG_ENV }}
+        run: |
+          test -n "$SERVER_PASSWORD" || { echo "::error::Missing secret SERVER_PASSWORD"; exit 1; }
+          test -n "$BLOG_ENV" || { echo "::error::Missing secret BLOG_ENV"; exit 1; }
+          printf '%s' "$BLOG_ENV" | grep -q '^DATABASE_URL=' || { echo "::error::BLOG_ENV must contain DATABASE_URL="; exit 1; }
+          printf '%s' "$BLOG_ENV" | grep -q '^JWT_SECRET=' || { echo "::error::BLOG_ENV must contain JWT_SECRET="; exit 1; }
+          echo "secrets ok"
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          BLOG_ENV: ${{ secrets.BLOG_ENV }}
+        with:
+          host: ${{ env.SERVER_HOST }}
+          username: ${{ env.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          envs: BLOG_ENV
+          command_timeout: 40m
+          script_stop: true
+          script: |
+            set -e
+            if [ ! -d "$HOME/x-blog/.git" ]; then
+              git clone https://github.com/xusofty-cyber/x-blog.git "$HOME/x-blog"
+            fi
+            cd "$HOME/x-blog"
+            git fetch origin main
+            git reset --hard origin/main
+            printf '%s\n' "$BLOG_ENV" > .env
+            chmod 600 .env
+            bash deploy/deploy.sh
+            echo "--- health check via web container ---"
+            curl -fsS http://127.0.0.1:13100/api/health
+            echo
+            echo "deploy done"
