@@ -178,6 +178,14 @@
   opacity: 0.92;
 }
 
+/* 加粗文本必须跟随主题前景色：Tailwind Typography 插件默认把 strong
+   写死为浅色模式的深色值，黑暗模式下会黑底黑字看不清（2026-10-24 实测） */
+.prose strong,
+.prose b {
+  color: var(--color-foreground);
+  font-weight: 700;
+}
+
 .prose a {
   color: var(--color-foreground);
   text-decoration: underline;

@@ -112,7 +112,7 @@ export default function AdminPostsPage() {
       {/* Top action header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">文章管理</h1>
+          <h1 className="text-2xl font-bold text-foreground">文章管理</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             共 <span className="font-semibold text-foreground">{total}</span> 篇文章
           </p>
@@ -130,8 +130,8 @@ export default function AdminPostsPage() {
       </div>
 
       {/* Filter bar */}
-      <div className="flex items-center gap-2 bg-white p-3 rounded-xl border border-slate-200">
-        <span className="text-xs font-semibold text-slate-400 ml-2">状态筛选：</span>
+      <div className="flex items-center gap-2 bg-card p-3 rounded-xl border border-border">
+        <span className="text-xs font-semibold text-muted-foreground ml-2">状态筛选：</span>
         <button
           onClick={() => {
             setStatusFilter('');
@@ -139,8 +139,8 @@ export default function AdminPostsPage() {
           }}
           className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
             statusFilter === ''
-              ? 'bg-slate-900 text-white'
-              : 'text-slate-600 hover:bg-slate-100'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:bg-muted'
           }`}
         >
           全部
@@ -153,7 +153,7 @@ export default function AdminPostsPage() {
           className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
             statusFilter === 'PUBLISHED'
               ? 'bg-emerald-600 text-white'
-              : 'text-slate-600 hover:bg-slate-100'
+              : 'text-muted-foreground hover:bg-muted'
           }`}
         >
           已发布
@@ -166,7 +166,7 @@ export default function AdminPostsPage() {
           className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
             statusFilter === 'DRAFT'
               ? 'bg-amber-600 text-white'
-              : 'text-slate-600 hover:bg-slate-100'
+              : 'text-muted-foreground hover:bg-muted'
           }`}
         >
           草稿箱
@@ -180,9 +180,9 @@ export default function AdminPostsPage() {
       )}
 
       {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase">
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <table className="min-w-full divide-y divide-border text-left text-sm">
+          <thead className="bg-muted text-xs font-semibold text-muted-foreground uppercase">
             <tr>
               <th scope="col" className="px-6 py-3.5">
                 标题 / Slug
@@ -201,27 +201,27 @@ export default function AdminPostsPage() {
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200 bg-white">
+          <tbody className="divide-y divide-border bg-card">
             {isLoading ? (
               <tr>
-                <td colSpan={5} className="py-12 text-center text-slate-400">
+                <td colSpan={5} className="py-12 text-center text-muted-foreground">
                   加载文章中...
                 </td>
               </tr>
             ) : posts.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-12 text-center text-slate-400">
+                <td colSpan={5} className="py-12 text-center text-muted-foreground">
                   暂无匹配的文章记录
                 </td>
               </tr>
             ) : (
               posts.map((post) => (
-                <tr key={post.id} className="hover:bg-slate-50/60 transition">
+                <tr key={post.id} className="hover:bg-muted/60 transition">
                   <td className="px-6 py-4">
-                    <div className="font-semibold text-slate-900 line-clamp-1">
+                    <div className="font-semibold text-foreground line-clamp-1">
                       {post.title}
                     </div>
-                    <div className="text-xs text-slate-400 font-mono mt-0.5">
+                    <div className="text-xs text-muted-foreground font-mono mt-0.5">
                       /posts/{post.slug}
                     </div>
                   </td>
@@ -233,12 +233,12 @@ export default function AdminPostsPage() {
                           {post.category.name}
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-400">无分类</span>
+                        <span className="text-xs text-muted-foreground">无分类</span>
                       )}
                       {post.tags?.map((t) => (
                         <span
                           key={t.id}
-                          className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500"
+                          className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
                         >
                           #{t.name}
                         </span>
@@ -252,20 +252,20 @@ export default function AdminPostsPage() {
                       title="点击切换状态"
                       className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer transition ${
                         post.status === 'PUBLISHED'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                          : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30 dark:hover:bg-emerald-500/25'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30 dark:hover:bg-amber-500/25'
                       }`}
                     >
                       ● {post.status === 'PUBLISHED' ? '已发布' : '草稿'}
                     </button>
                   </td>
 
-                  <td className="px-6 py-4 text-xs text-slate-500 whitespace-nowrap">
+                  <td className="px-6 py-4 text-xs text-muted-foreground whitespace-nowrap">
                     <div>
                       创建: {new Date(post.createdAt).toLocaleDateString('zh-CN')}
                     </div>
                     {post.publishedAt && (
-                      <div className="text-emerald-600 mt-0.5">
+                      <div className="text-emerald-600 dark:text-emerald-400 mt-0.5">
                         发布: {new Date(post.publishedAt).toLocaleDateString('zh-CN')}
                       </div>
                     )}
@@ -275,7 +275,7 @@ export default function AdminPostsPage() {
                     <Link
                       href={`/posts/${post.slug}`}
                       target="_blank"
-                      className="text-xs text-slate-500 hover:text-slate-800"
+                      className="text-xs text-muted-foreground hover:text-foreground"
                     >
                       查看
                     </Link>
@@ -287,7 +287,7 @@ export default function AdminPostsPage() {
                     </Link>
                     <button
                       onClick={() => handleDeletePost(post.id, post.title)}
-                      className="text-xs font-medium text-red-600 hover:text-red-800"
+                      className="text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
                     >
                       删除
                     </button>
@@ -300,21 +300,21 @@ export default function AdminPostsPage() {
 
         {/* Simple pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-slate-200 px-6 py-3 bg-slate-50">
+          <div className="flex items-center justify-between border-t border-border px-6 py-3 bg-muted">
             <button
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-40"
             >
               ← 上一页
             </button>
-            <span className="text-xs text-slate-600">
+            <span className="text-xs text-muted-foreground">
               第 {page} / {totalPages} 页
             </span>
             <button
               disabled={page >= totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-40"
             >
               下一页 →
             </button>

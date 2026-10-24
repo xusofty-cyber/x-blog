@@ -70,7 +70,7 @@ export default function EditPostPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center text-sm text-slate-500">
+      <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
         正在读取文章详情...
       </div>
     );
@@ -84,7 +84,7 @@ export default function EditPostPage() {
         </div>
         <button
           onClick={() => router.push('/admin/posts')}
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
+          className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
         >
           返回文章列表
         </button>
@@ -94,11 +94,11 @@ export default function EditPostPage() {
 
   return (
     <div className="space-y-6">
-      <div className="border-b border-slate-200 pb-4">
-        <h1 className="text-2xl font-bold text-slate-900">
+      <div className="border-b border-border pb-4">
+        <h1 className="text-2xl font-bold text-foreground">
           编辑文章：{post.title}
         </h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-muted-foreground">
           修改文章标题、分类、标签与正文 Markdown 内容。
         </p>
       </div>

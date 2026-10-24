@@ -153,7 +153,7 @@ export default async function PostPage({ params }: PostPageProps) {
 
           {/* Prose Body (max-w-[720px] centered) */}
           <div
-            className="prose w-full max-w-[720px]"
+            className="prose dark:prose-invert w-full max-w-[720px]"
             dangerouslySetInnerHTML={{ __html: htmlContent }}
           />
 

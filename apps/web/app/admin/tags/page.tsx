@@ -117,8 +117,8 @@ export default function AdminTagsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">标签管理</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <h1 className="text-2xl font-bold text-foreground">标签管理</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           管理文章打标关键词，支持多对多文章聚合与检索。
         </p>
       </div>
@@ -130,13 +130,13 @@ export default function AdminTagsPage() {
       )}
 
       {/* Create / Edit Form Card */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-base font-bold text-slate-900 mb-4">
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <h2 className="text-base font-bold text-foreground mb-4">
           {editingId ? '编辑标签' : '新建标签'}
         </h2>
         <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4 items-end">
           <div className="flex-1 w-full">
-            <label className="block text-xs font-semibold text-slate-600 mb-1">
+            <label className="block text-xs font-semibold text-muted-foreground mb-1">
               标签名称 <span className="text-red-500">*</span>
             </label>
             <input
@@ -184,9 +184,9 @@ export default function AdminTagsPage() {
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase">
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <table className="min-w-full divide-y divide-border text-left text-sm">
+          <thead className="bg-muted text-xs font-semibold text-muted-foreground uppercase">
             <tr>
               <th scope="col" className="px-6 py-3.5">
                 标签名称
@@ -202,31 +202,31 @@ export default function AdminTagsPage() {
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200 bg-white">
+          <tbody className="divide-y divide-border bg-card">
             {isLoading ? (
               <tr>
-                <td colSpan={4} className="py-10 text-center text-slate-400">
+                <td colSpan={4} className="py-10 text-center text-muted-foreground">
                   加载标签列表中...
                 </td>
               </tr>
             ) : tags.length === 0 ? (
               <tr>
-                <td colSpan={4} className="py-10 text-center text-slate-400">
+                <td colSpan={4} className="py-10 text-center text-muted-foreground">
                   暂无标签记录，请在上方新建
                 </td>
               </tr>
             ) : (
               tags.map((tag) => (
-                <tr key={tag.id} className="hover:bg-slate-50/60 transition">
-                  <td className="px-6 py-4 font-semibold text-slate-900">
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">
+                <tr key={tag.id} className="hover:bg-muted/60 transition">
+                  <td className="px-6 py-4 font-semibold text-foreground">
+                    <span className="rounded-full bg-muted px-2.5 py-1 text-xs text-foreground">
                       #{tag.name}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-xs font-mono text-slate-500">
+                  <td className="px-6 py-4 text-xs font-mono text-muted-foreground">
                     {tag.slug}
                   </td>
-                  <td className="px-6 py-4 text-xs text-slate-600">
+                  <td className="px-6 py-4 text-xs text-muted-foreground">
                     {tag._count?.posts ?? 0} 篇
                   </td>
                   <td className="px-6 py-4 text-right space-x-3 whitespace-nowrap">
@@ -238,7 +238,7 @@ export default function AdminTagsPage() {
                     </button>
                     <button
                       onClick={() => handleDelete(tag.id, tag.name)}
-                      className="text-xs font-medium text-red-600 hover:text-red-800"
+                      className="text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
                     >
                       删除
                     </button>

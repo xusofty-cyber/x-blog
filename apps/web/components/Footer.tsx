@@ -106,6 +106,18 @@ export default function Footer() {
           <p>© {currentYear} X-Blog. Swiss Modernism 2.0 Editorial System.</p>
           <p className="font-mono text-[11px]">Next.js 15 App Router · NestJS 10</p>
         </div>
+
+        {/* 工信部备案信息：全站页脚统一展示（前台、后台、文章页共用此 Footer） */}
+        <div className="mt-6 text-center text-xs text-muted-foreground">
+          <a
+            href="https://beian.miit.gov.cn/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-accent transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+          >
+            京ICP备16065200号
+          </a>
+        </div>
       </div>
     </footer>
   );
