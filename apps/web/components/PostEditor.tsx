@@ -196,6 +196,11 @@ export default function PostEditor({ initialPost, isEdit = false }: PostEditorPr
       return;
     }
 
+    // 上传开始前（await 之前）记录 textarea 当前光标/选区位置，避免上传耗时期间用户输入被旧状态覆盖
+    const textarea = textareaRef.current;
+    const recordedStart = textarea ? textarea.selectionStart : undefined;
+    const recordedEnd = textarea ? textarea.selectionEnd : undefined;
+
     setIsContentUploading(true);
     setUploadMessage(`正在上传 ${file.name}...`);
     setErrorMessage('');
@@ -222,20 +227,25 @@ export default function PostEditor({ initialPost, isEdit = false }: PostEditorPr
         ? `\n<video controls src="${data.url}"></video>\n`
         : `\n![](${data.url})\n`;
 
-      const textarea = textareaRef.current;
-      if (textarea) {
-        const start = textarea.selectionStart ?? content.length;
-        const end = textarea.selectionEnd ?? content.length;
-        const newContent = content.slice(0, start) + insertSnippet + content.slice(end);
-        setContent(newContent);
-        setTimeout(() => {
-          textarea.focus();
-          const nextPos = start + insertSnippet.length;
-          textarea.setSelectionRange(nextPos, nextPos);
-        }, 0);
-      } else {
-        setContent((prev) => prev + insertSnippet);
-      }
+      let finalCursorPos = 0;
+      setContent((prev) => {
+        const currentLen = prev.length;
+        const start = Math.min(Math.max(0, recordedStart ?? currentLen), currentLen);
+        const end = Math.min(Math.max(0, recordedEnd ?? start), currentLen);
+        const safeStart = Math.min(start, end);
+        const safeEnd = Math.max(start, end);
+
+        finalCursorPos = safeStart + insertSnippet.length;
+        return prev.slice(0, safeStart) + insertSnippet + prev.slice(safeEnd);
+      });
+
+      setTimeout(() => {
+        const el = textareaRef.current;
+        if (el) {
+          el.focus();
+          el.setSelectionRange(finalCursorPos, finalCursorPos);
+        }
+      }, 0);
 
       setUploadMessage('上传完成并已插入正文');
       setTimeout(() => setUploadMessage(''), 2500);

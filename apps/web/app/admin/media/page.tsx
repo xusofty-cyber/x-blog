@@ -10,8 +10,16 @@ interface MediaItem {
   mtime: string;
 }
 
+interface UploadStats {
+  totalSize: number;
+  totalCount: number;
+  limit: number;
+  remaining: number;
+}
+
 export default function AdminMediaPage() {
   const [items, setItems] = useState<MediaItem[]>([]);
+  const [stats, setStats] = useState<UploadStats | null>(null);
   const [filter, setFilter] = useState<'all' | 'image' | 'video'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -52,18 +60,30 @@ export default function AdminMediaPage() {
     setErrorMessage('');
 
     try {
-      const res = await fetch('/api/uploads', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const [listRes, statsRes] = await Promise.all([
+        fetch('/api/uploads', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        fetch('/api/uploads/stats', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+      ]);
 
-      if (!res.ok) {
+      if (!listRes.ok) {
         throw new Error('获取媒体库列表失败');
       }
 
-      const data: MediaItem[] = await res.json();
+      const data: MediaItem[] = await listRes.json();
       setItems(Array.isArray(data) ? data : []);
+
+      if (statsRes.ok) {
+        const statsData: UploadStats = await statsRes.json();
+        setStats(statsData);
+      }
     } catch (err: any) {
       setErrorMessage(err.message || '加载媒体库失败');
     } finally {
@@ -101,6 +121,15 @@ export default function AdminMediaPage() {
 
     if (isVideo && file.size > 100 * 1024 * 1024) {
       setErrorMessage(`视频文件大小超过 100MB 限制（当前 ${formatFileSize(file.size)}）`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    // 上传前若本次文件会使总量超限，先在前端拦截并提示，不发起上传
+    if (stats && stats.totalSize + file.size > stats.limit) {
+      setErrorMessage(
+        `上传失败：该文件（${formatFileSize(file.size)}）将超出存储总量上限 5GB（当前已用 ${formatFileSize(stats.totalSize)}，剩余 ${formatFileSize(stats.remaining)}）`
+      );
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -210,6 +239,14 @@ export default function AdminMediaPage() {
           <p className="text-sm text-muted-foreground mt-1">
             浏览、上传与管理博客系统中的静态图片及视频资源
           </p>
+          {stats && (
+            <div className="mt-2 text-xs font-mono text-muted-foreground flex items-center gap-2">
+              <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+              <span>
+                已用 {formatFileSize(stats.totalSize)} / 上限 5GB（共 {stats.totalCount} 个文件）
+              </span>
+            </div>
+          )}
         </div>
 
         <div>
