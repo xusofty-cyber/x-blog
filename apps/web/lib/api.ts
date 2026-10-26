@@ -1,4 +1,4 @@
-import { Post, Category, Tag, PaginatedResponse } from './types';
+import { Post, Category, Tag, PaginatedResponse, SiteSettings } from './types';
 
 const API_BASE_URL = process.env.API_INTERNAL_URL || 'http://localhost:4000';
 
@@ -108,4 +108,17 @@ export async function getTags(): Promise<Tag[]> {
  */
 export function getSiteUrl(): string {
   return process.env.NEXT_PUBLIC_SITE_URL || 'https://blog.ulife.vip';
+}
+
+export const DEFAULT_SITE_SETTINGS: SiteSettings = {
+  heroTagline: '探索现代 Web 架构、全栈系统工程与理性设计秩序。以编辑杂志排版呈现有深度的技术思考与实践。',
+  heroEyebrow: 'VOL. 2026 · ESSAYS & ENGINEERING',
+};
+
+/**
+ * 获取站点全局设置（首页标语、眉标等）
+ * 失败时返回默认值，绝不抛错阻断首页渲染
+ */
+export async function getSiteSettings(): Promise<SiteSettings> {
+  return fetchJson<SiteSettings>('/api/settings', DEFAULT_SITE_SETTINGS);
 }

@@ -58,16 +58,23 @@ export default function PostCard({ post }: PostCardProps) {
       <div className="flex flex-1 flex-col p-5">
         {/* Category & Date */}
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
-          {post.category ? (
-            <Link
-              href={`/categories/${post.category.slug}`}
-              className="inline-flex items-center rounded-full border border-border bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-foreground hover:border-accent hover:text-accent transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {post.category.name}
-            </Link>
-          ) : (
-            <span className="text-muted-foreground text-xs">随笔</span>
-          )}
+          <div className="flex items-center gap-2">
+            {post.isPinned ? (
+              <span className="font-mono text-[11px] font-semibold tracking-wider uppercase text-accent bg-accent/10 px-2 py-0.5 rounded-sm">
+                置顶
+              </span>
+            ) : null}
+            {post.category ? (
+              <Link
+                href={`/categories/${post.category.slug}`}
+                className="inline-flex items-center rounded-full border border-border bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-foreground hover:border-accent hover:text-accent transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {post.category.name}
+              </Link>
+            ) : (
+              <span className="text-muted-foreground text-xs">随笔</span>
+            )}
+          </div>
 
           <time
             dateTime={post.publishedAt || post.createdAt}

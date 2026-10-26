@@ -46,7 +46,7 @@ export class PostsService {
         where,
         skip,
         take: pageSize,
-        orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
+        orderBy: [{ isPinned: 'desc' }, { publishedAt: 'desc' }, { createdAt: 'desc' }],
         include: {
           category: true,
           tags: true,
@@ -280,6 +280,7 @@ export class PostsService {
     if (dto.excerpt !== undefined) data.excerpt = dto.excerpt;
     if (dto.content !== undefined) data.content = dto.content;
     if (dto.coverImage !== undefined) data.coverImage = dto.coverImage;
+    if (dto.isPinned !== undefined) data.isPinned = dto.isPinned;
 
     if (dto.categoryId !== undefined) {
       if (dto.categoryId) {

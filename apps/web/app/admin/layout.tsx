@@ -62,6 +62,7 @@ export default function AdminLayout({
     { label: '媒体库', href: '/admin/media', exact: false },
     { label: '分类管理', href: '/admin/categories', exact: false },
     { label: '标签管理', href: '/admin/tags', exact: false },
+    { label: '站点设置', href: '/admin/settings', exact: false },
   ];
 
   return (

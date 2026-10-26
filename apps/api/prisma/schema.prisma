@@ -56,4 +56,11 @@ model Post {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   viewCount   Int         @default(0)
+  isPinned    Boolean     @default(false)
+}
+
+model SiteSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }

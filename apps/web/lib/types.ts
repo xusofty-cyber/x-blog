@@ -46,6 +46,12 @@ export interface Post {
   createdAt: string;
   updatedAt: string;
   viewCount: number;
+  isPinned: boolean;
+}
+
+export interface SiteSettings {
+  heroTagline: string;
+  heroEyebrow: string;
 }
 
 export interface PaginatedResponse<T> {

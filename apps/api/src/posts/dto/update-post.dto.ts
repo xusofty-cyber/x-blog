@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, IsArray } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsArray, IsBoolean } from 'class-validator';
 import { PostStatus } from '@prisma/client';
 
 export class UpdatePostDto {
@@ -37,4 +37,8 @@ export class UpdatePostDto {
   @IsString({ each: true, message: '每个标签 ID 必须是字符串' })
   @IsOptional()
   tagIds?: string[];
+
+  @IsBoolean({ message: 'isPinned 必须是布尔值' })
+  @IsOptional()
+  isPinned?: boolean;
 }

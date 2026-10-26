@@ -80,6 +80,31 @@ export default function AdminPostsPage() {
     }
   };
 
+  // Toggle pin
+  const handleTogglePin = async (post: Post) => {
+    const token = localStorage.getItem('xblog_token');
+    if (!token) return;
+
+    try {
+      const res = await fetch(`/api/posts/${post.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ isPinned: !post.isPinned }),
+      });
+
+      if (!res.ok) {
+        throw new Error('切换置顶状态失败');
+      }
+
+      fetchPosts();
+    } catch (err: any) {
+      alert(err.message || '操作失败');
+    }
+  };
+
   // Delete post
   const handleDeletePost = async (id: string, title: string) => {
     if (!window.confirm(`确定要彻底删除文章「${title}」吗？此操作不可逆！`)) {
@@ -221,8 +246,15 @@ export default function AdminPostsPage() {
               posts.map((post) => (
                 <tr key={post.id} className="hover:bg-muted/60 transition">
                   <td className="px-6 py-4">
-                    <div className="font-semibold text-foreground line-clamp-1">
-                      {post.title}
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-foreground line-clamp-1">
+                        {post.title}
+                      </span>
+                      {post.isPinned && (
+                        <span className="shrink-0 font-mono text-[10px] font-semibold text-accent bg-accent/10 px-1.5 py-0.5 rounded border border-accent/20">
+                          置顶
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-muted-foreground font-mono mt-0.5">
                       /posts/{post.slug}
@@ -279,6 +311,16 @@ export default function AdminPostsPage() {
                   </td>
 
                   <td className="px-6 py-4 text-right space-x-3 whitespace-nowrap">
+                    <button
+                      onClick={() => handleTogglePin(post)}
+                      className={`text-xs font-medium transition-colors cursor-pointer ${
+                        post.isPinned
+                          ? 'text-accent hover:text-accent/80 font-semibold'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {post.isPinned ? '取消置顶' : '置顶'}
+                    </button>
                     <Link
                       href={`/posts/${post.slug}`}
                       target="_blank"

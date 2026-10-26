@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Calendar, Clock, ArrowRight, BookOpen } from 'lucide-react';
 import PostCard from '@/components/PostCard';
 import Pagination from '@/components/Pagination';
-import { getPosts, getCategories } from '@/lib/api';
+import { getPosts, getCategories, getSiteSettings } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,9 +18,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const page = Math.max(1, Number(resolvedParams.page) || 1);
   const category = resolvedParams.category;
 
-  const [postsRes, categories] = await Promise.all([
+  const [postsRes, categories, settings] = await Promise.all([
     getPosts({ page, pageSize: 9, category }),
     getCategories(),
+    getSiteSettings(),
   ]);
 
   const { items: posts, totalPages, total } = postsRes;
@@ -37,7 +38,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <div className="max-w-3xl">
             <div className="flex items-center gap-2.5 mb-3.5">
               <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground border border-border px-2.5 py-0.5 rounded-sm">
-                VOL. 2026 · ESSAYS & ENGINEERING
+                {settings.heroEyebrow}
               </span>
               <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
               <span className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider">
@@ -48,7 +49,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               X-Blog
             </h1>
             <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed max-w-2xl">
-              探索现代 Web 架构、全栈系统工程与理性设计秩序。以编辑杂志排版呈现有深度的技术思考与实践。
+              {settings.heroTagline}
             </p>
           </div>
 
@@ -157,6 +158,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <div className="lg:col-span-5 flex flex-col justify-between space-y-4">
               <div>
                 <div className="flex items-center gap-2 mb-3">
+                  {featuredPost.isPinned && (
+                    <span className="font-mono text-[11px] font-semibold tracking-wider uppercase text-accent bg-accent/10 px-2 py-0.5 rounded-sm">
+                      置顶
+                    </span>
+                  )}
                   <span className="font-mono text-[11px] font-semibold tracking-wider uppercase text-accent bg-accent/10 px-2 py-0.5 rounded-sm">
                     本期特载
                   </span>
