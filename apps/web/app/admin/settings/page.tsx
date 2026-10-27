@@ -151,7 +151,8 @@ export default function AdminSettingsPage() {
                 首页标语 <span className="text-red-500">*</span>
               </label>
               <p className="text-xs text-muted-foreground mb-2">
-                显示在首页大标题下方的副标题介绍文本，支持最多 500 个字符。
+                显示在首页大标题下方的副标题介绍文本，支持最多 500 个字符；
+                支持行内 Markdown：**粗体**、*斜体*、`代码`、==高亮==、[链接文字](https://…)。
               </p>
               <textarea
                 id="heroTagline"

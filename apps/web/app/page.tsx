@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Calendar, Clock, ArrowRight, BookOpen } from 'lucide-react';
 import PostCard from '@/components/PostCard';
+import InlineMarkdown from '@/components/InlineMarkdown';
 import Pagination from '@/components/Pagination';
 import { getPosts, getCategories, getSiteSettings } from '@/lib/api';
 
@@ -49,7 +50,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               X-Blog
             </h1>
             <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed max-w-2xl">
-              {settings.heroTagline}
+              <InlineMarkdown text={settings.heroTagline} />
             </p>
           </div>
 
