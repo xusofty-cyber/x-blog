@@ -3,8 +3,21 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { MailProvider, mailboxTypeLabel, useMailContext } from './mail-context';
 
 export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <MailProvider>
+      <AdminLayoutInner>{children}</AdminLayoutInner>
+    </MailProvider>
+  );
+}
+
+function AdminLayoutInner({
   children,
 }: {
   children: React.ReactNode;
@@ -12,6 +25,37 @@ export default function AdminLayout({
   const pathname = usePathname();
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const {
+    groups,
+    selectedMailboxId,
+    setSelectedMailboxId,
+    mailListExpanded,
+    setMailListExpanded,
+    setEditGroupId,
+  } = useMailContext();
+
+  const handleMailNavClick = () => {
+    if (pathname.startsWith('/admin/mail')) {
+      setMailListExpanded(!mailListExpanded);
+    } else {
+      setMailListExpanded(true);
+      router.push('/admin/mail');
+    }
+  };
+
+  const openMailbox = (mailboxId: string) => {
+    setSelectedMailboxId(mailboxId);
+    if (!pathname.startsWith('/admin/mail')) {
+      router.push('/admin/mail');
+    }
+  };
+
+  const openGroupEdit = (groupId: string) => {
+    setEditGroupId(groupId);
+    if (!pathname.startsWith('/admin/mail')) {
+      router.push('/admin/mail');
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('xblog_token');
@@ -70,7 +114,7 @@ export default function AdminLayout({
     <div className="flex min-h-screen bg-background">
       {/* Sidebar */}
       <aside className="w-64 bg-zinc-950 border-r border-border text-zinc-300 flex flex-col justify-between shrink-0 shadow-lg">
-        <div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {/* Brand */}
           <div className="h-16 flex items-center px-6 border-b border-zinc-800 gap-3">
             <span className="font-serif flex h-8 w-8 items-center justify-center rounded-btn bg-white text-zinc-950 font-bold text-sm">
@@ -87,6 +131,67 @@ export default function AdminLayout({
               const active = item.exact
                 ? pathname === item.href
                 : pathname.startsWith(item.href);
+
+              if (item.href === '/admin/mail') {
+                return (
+                  <div key={item.href}>
+                    <button
+                      type="button"
+                      onClick={handleMailNavClick}
+                      className={`flex w-full items-center px-4 py-2.5 text-sm font-medium rounded-btn transition-colors duration-200 ${
+                        active
+                          ? 'bg-zinc-800 text-white font-semibold'
+                          : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'
+                      }`}
+                    >
+                      <span className="flex-1 text-left">
+                        {item.label}（{groups.length} 个 QQ）
+                      </span>
+                      <span aria-hidden>{mailListExpanded ? '▾' : '▸'}</span>
+                    </button>
+                    {mailListExpanded && (
+                      <div className="mt-1 ml-2 space-y-3 max-h-[45vh] overflow-y-auto pr-1">
+                        {groups.map((g) => (
+                          <div key={g.id} className="rounded-btn bg-zinc-900/60 p-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-semibold text-white truncate">{g.label}</span>
+                              <button
+                                type="button"
+                                onClick={() => openGroupEdit(g.id)}
+                                className="shrink-0 rounded border border-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-400 hover:text-white hover:bg-zinc-800"
+                              >
+                                更新
+                              </button>
+                            </div>
+                            <div className="mt-1.5 space-y-1">
+                              {g.mailboxes.map((m) => (
+                                <button
+                                  key={m.id}
+                                  type="button"
+                                  onClick={() => openMailbox(m.id)}
+                                  className={`w-full text-left rounded px-2 py-1.5 ${
+                                    selectedMailboxId === m.id
+                                      ? 'bg-zinc-700 text-white'
+                                      : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
+                                  }`}
+                                >
+                                  <span className="block text-[11px] font-medium text-zinc-500">
+                                    {mailboxTypeLabel(m.mailboxType)}
+                                  </span>
+                                  <span className="block text-xs truncate">{m.email}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        {groups.length === 0 && (
+                          <p className="px-2 py-1 text-xs text-zinc-500">暂无 QQ，去邮箱管理添加。</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
 
               return (
                 <Link

@@ -67,6 +67,16 @@ model SiteSetting {
 
 // 后台邮箱切换（v1，只读）：只存账号与加密后的 QQ 邮箱授权码，
 // 不在博客库里存邮件正文与附件；邮件每次打开时按需经 IMAP 拉取。
+// v2：一个 QQ 分组下最多 3 个邮箱（数字、字母、Foxmail 各一），
+// 切换列表按 QQ 分组展示，免得记某个邮箱属于哪个 QQ。
+model QqGroup {
+  id           String        @id @default(uuid())
+  label        String
+  mailAccounts MailAccount[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
 model MailAccount {
   id                String    @id @default(uuid())
   label             String
@@ -75,8 +85,14 @@ model MailAccount {
   imapPort          Int       @default(993)
   username          String
   encryptedAuthCode String
+  qqGroupId         String
+  qqGroup           QqGroup   @relation(fields: [qqGroupId], references: [id], onDelete: Cascade)
+  // numeric = 数字 QQ 邮箱，letter = 字母 QQ 邮箱，foxmail = Foxmail 邮箱
+  mailboxType       String    @default("numeric")
   lastTestedAt      DateTime?
   lastError         String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+
+  @@index([qqGroupId])
 }

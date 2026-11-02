@@ -15,11 +15,48 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { MailService } from './mail.service';
 import { CreateMailAccountDto } from './dto/create-mail-account.dto';
 import { UpdateMailAccountDto } from './dto/update-mail-account.dto';
+import { AddMailboxDto, CreateQqGroupDto } from './dto/create-qq-group.dto';
+import { UpdateMailboxDto, UpdateQqGroupDto } from './dto/update-qq-group.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('mail')
 export class MailController {
   constructor(private readonly mailService: MailService) {}
+
+  @Get('groups')
+  listGroups() {
+    return this.mailService.listGroups();
+  }
+
+  @Post('groups')
+  createGroup(@Body() dto: CreateQqGroupDto) {
+    return this.mailService.createGroup(dto);
+  }
+
+  @Put('groups/:id')
+  updateGroup(@Param('id') id: string, @Body() dto: UpdateQqGroupDto) {
+    return this.mailService.updateGroup(id, dto);
+  }
+
+  @Delete('groups/:id')
+  deleteGroup(@Param('id') id: string) {
+    return this.mailService.deleteGroup(id);
+  }
+
+  @Post('groups/:id/mailboxes')
+  addMailbox(@Param('id') id: string, @Body() dto: AddMailboxDto) {
+    return this.mailService.addMailbox(id, dto);
+  }
+
+  @Put('mailboxes/:id')
+  updateMailbox(@Param('id') id: string, @Body() dto: UpdateMailboxDto) {
+    return this.mailService.updateMailbox(id, dto);
+  }
+
+  @Delete('mailboxes/:id')
+  deleteMailbox(@Param('id') id: string) {
+    return this.mailService.deleteMailbox(id);
+  }
 
   @Get('accounts')
   listAccounts() {
