@@ -7,6 +7,7 @@ import { TagsModule } from './tags/tags.module';
 import { HealthModule } from './health/health.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { SettingsModule } from './settings/settings.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { SettingsModule } from './settings/settings.module';
     HealthModule,
     UploadsModule,
     SettingsModule,
+    MailModule,
   ],
 })
 export class AppModule {}

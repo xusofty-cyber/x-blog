@@ -63,6 +63,7 @@ export default function AdminLayout({
     { label: '分类管理', href: '/admin/categories', exact: false },
     { label: '标签管理', href: '/admin/tags', exact: false },
     { label: '站点设置', href: '/admin/settings', exact: false },
+    { label: '邮箱管理', href: '/admin/mail', exact: false },
   ];
 
   return (

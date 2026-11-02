@@ -64,3 +64,19 @@ model SiteSetting {
   value     String
   updatedAt DateTime @updatedAt
 }
+
+// 后台邮箱切换（v1，只读）：只存账号与加密后的 QQ 邮箱授权码，
+// 不在博客库里存邮件正文与附件；邮件每次打开时按需经 IMAP 拉取。
+model MailAccount {
+  id                String    @id @default(uuid())
+  label             String
+  email             String    @unique
+  imapHost          String    @default("imap.qq.com")
+  imapPort          Int       @default(993)
+  username          String
+  encryptedAuthCode String
+  lastTestedAt      DateTime?
+  lastError         String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
