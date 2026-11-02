@@ -1,4 +1,4 @@
-import { PrismaClient, PostStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -12,15 +12,13 @@ async function main() {
   const adminEmail = process.env.SEED_ADMIN_EMAIL?.trim();
   const adminPassword = process.env.SEED_ADMIN_PASSWORD?.trim();
 
-  let adminUser: { id: string } | null = null;
-
   if (!adminEmail || !adminPassword) {
     console.warn(
       'WARNING: SEED_ADMIN_EMAIL or SEED_ADMIN_PASSWORD is missing. Skipping admin creation without setting default credentials.',
     );
   } else {
     const passwordHash = await bcrypt.hash(adminPassword, 10);
-    adminUser = await prisma.user.upsert({
+    await prisma.user.upsert({
       where: { email: adminEmail },
       update: {
         passwordHash,
@@ -34,13 +32,10 @@ async function main() {
     console.log(`Admin user upserted: ${adminEmail}`);
   }
 
-  if (!adminUser && adminEmail) {
-    adminUser = await prisma.user.findUnique({ where: { email: adminEmail } });
-  }
-  if (!adminUser) {
-    adminUser = await prisma.user.findFirst();
-  }
-
+  // 注意：这里不再创建示例文章 Hello, X-Blog（slug: hello-x-blog）。
+  // 之前 seed 每次部署都 upsert 它并设为 PUBLISHED，导致用户删掉后
+  // 下次部署又会把它重新发布出来。示例文章已从 seed 里彻底拿掉，
+  // 以后部署只保证管理员账号、分类、标签，不会再碰任何文章。
   // Example category: 技术 (slug: tech)
   const category = await prisma.category.upsert({
     where: { slug: 'tech' },
@@ -62,41 +57,6 @@ async function main() {
     },
   });
   console.log('Tag upserted: NestJS (nestjs)');
-
-  // Example post: Hello, X-Blog (slug: hello-x-blog, PUBLISHED)
-  if (adminUser) {
-    const post = await prisma.post.upsert({
-      where: { slug: 'hello-x-blog' },
-      update: {
-        title: 'Hello, X-Blog',
-        excerpt: '欢迎来到 X-Blog，这是一个基于 NestJS 和 Next.js 构建的现代博客系统。',
-        content: `# Hello, X-Blog\n\n欢迎来到 **X-Blog**！\n\n这是一个现代全栈博客平台，采用以下技术栈：\n- **后端**: NestJS 10, Prisma 5, PostgreSQL\n- **前端**: Next.js 14, Tailwind CSS, TypeScript\n\n### 特性\n- 支持 Markdown 编辑与渲染\n- 完整的文章、分类与标签管理\n- 安全的 JWT 身份验证\n- 响应式设计与优秀性能\n\n欢迎体验！`,
-        status: PostStatus.PUBLISHED,
-        publishedAt: new Date(),
-        categoryId: category.id,
-        authorId: adminUser.id,
-        tags: {
-          connect: [{ id: tag.id }],
-        },
-      },
-      create: {
-        title: 'Hello, X-Blog',
-        slug: 'hello-x-blog',
-        excerpt: '欢迎来到 X-Blog，这是一个基于 NestJS 和 Next.js 构建的现代博客系统。',
-        content: `# Hello, X-Blog\n\n欢迎来到 **X-Blog**！\n\n这是一个现代全栈博客平台，采用以下技术栈：\n- **后端**: NestJS 10, Prisma 5, PostgreSQL\n- **前端**: Next.js 14, Tailwind CSS, TypeScript\n\n### 特性\n- 支持 Markdown 编辑与渲染\n- 完整的文章、分类与标签管理\n- 安全的 JWT 身份验证\n- 响应式设计与优秀性能\n\n欢迎体验！`,
-        status: PostStatus.PUBLISHED,
-        publishedAt: new Date(),
-        categoryId: category.id,
-        authorId: adminUser.id,
-        tags: {
-          connect: [{ id: tag.id }],
-        },
-      },
-    });
-    console.log(`Post upserted: ${post.title} (${post.slug})`);
-  } else {
-    console.warn('Skipping example post creation because no user exists to set as author.');
-  }
 }
 
 main()
