@@ -151,39 +151,59 @@ function AdminLayoutInner({
                     </button>
                     {mailListExpanded && (
                       <div className="mt-1 ml-2 space-y-3 pr-1">
-                        {groups.map((g) => (
-                          <div key={g.id} className="rounded-btn bg-zinc-900/60 p-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-xs font-semibold text-white truncate">{g.label}</span>
-                              <button
-                                type="button"
-                                onClick={() => openGroupEdit(g.id)}
-                                className="shrink-0 rounded border border-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-400 hover:text-white hover:bg-zinc-800"
-                              >
-                                更新
-                              </button>
-                            </div>
-                            <div className="mt-1.5 space-y-1">
-                              {g.mailboxes.map((m) => (
+                        {groups.map((g) => {
+                          // 数字邮箱就是 QQ 号本身（分组标题已是 QQ 号），左侧不再单列一行省空间；
+                          // 点分组标题即查看数字邮箱（没有数字邮箱的组则查看该组第一个邮箱）
+                          const numericMailbox = g.mailboxes.find((m) => m.mailboxType === 'numeric');
+                          const defaultMailbox = numericMailbox ?? g.mailboxes[0];
+                          const visibleMailboxes = g.mailboxes.filter((m) => m.mailboxType !== 'numeric');
+                          return (
+                            <div key={g.id} className="rounded-btn bg-zinc-900/60 p-2">
+                              <div className="flex items-center justify-between gap-2">
                                 <button
-                                  key={m.id}
                                   type="button"
-                                  onClick={() => openMailbox(m.id)}
-                                  className={`w-full text-left rounded px-2 py-1.5 ${
-                                    selectedMailboxId === m.id
+                                  title={numericMailbox ? '点击查看数字邮箱' : '点击查看该 QQ 的邮箱'}
+                                  onClick={() => defaultMailbox && openMailbox(defaultMailbox.id)}
+                                  className={`flex-1 min-w-0 text-left rounded px-1.5 py-1 text-xs font-semibold truncate ${
+                                    defaultMailbox && selectedMailboxId === defaultMailbox.id
                                       ? 'bg-zinc-700 text-white'
-                                      : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
+                                      : 'text-white hover:bg-zinc-800'
                                   }`}
                                 >
-                                  <span className="block text-[11px] font-medium text-zinc-500">
-                                    {mailboxTypeLabel(m.mailboxType)}
-                                  </span>
-                                  <span className="block text-xs truncate">{m.email}</span>
+                                  {g.label}
                                 </button>
-                              ))}
+                                <button
+                                  type="button"
+                                  onClick={() => openGroupEdit(g.id)}
+                                  className="shrink-0 rounded border border-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-400 hover:text-white hover:bg-zinc-800"
+                                >
+                                  更新
+                                </button>
+                              </div>
+                              {visibleMailboxes.length > 0 && (
+                                <div className="mt-1.5 space-y-1">
+                                  {visibleMailboxes.map((m) => (
+                                    <button
+                                      key={m.id}
+                                      type="button"
+                                      onClick={() => openMailbox(m.id)}
+                                      className={`w-full text-left rounded px-2 py-1.5 ${
+                                        selectedMailboxId === m.id
+                                          ? 'bg-zinc-700 text-white'
+                                          : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
+                                      }`}
+                                    >
+                                      <span className="block text-[11px] font-medium text-zinc-500">
+                                        {mailboxTypeLabel(m.mailboxType)}
+                                      </span>
+                                      <span className="block text-xs truncate">{m.email}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                         {groups.length === 0 && (
                           <p className="px-2 py-1 text-xs text-zinc-500">暂无 QQ，去邮箱管理添加。</p>
                         )}

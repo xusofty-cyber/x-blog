@@ -311,7 +311,7 @@ export default function AdminMailPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">邮箱管理</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          左侧“邮箱管理”下方是按 QQ 分组的邮箱列表，点一个邮箱就切换到它；点“邮箱管理”可以把列表收起来或展开。
+          左侧“邮箱管理”下方是按 QQ 分组的邮箱列表：点分组标题查看数字邮箱（数字邮箱就是 QQ 号，不再单列一行），点字母或 Foxmail 行查看对应邮箱；点“邮箱管理”可以把列表收起来或展开。
           一个 QQ 的数字、字母、Foxmail 三个邮箱共用一个总授权码。邮件可以删除，删除前会二次确认。
           授权码只在添加或更新时提交给后端加密保存，不会在页面上回显。
         </p>
