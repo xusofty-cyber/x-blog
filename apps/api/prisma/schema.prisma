@@ -70,11 +70,14 @@ model SiteSetting {
 // v2：一个 QQ 分组下最多 3 个邮箱（数字、字母、Foxmail 各一），
 // 切换列表按 QQ 分组展示，免得记某个邮箱属于哪个 QQ。
 model QqGroup {
-  id           String        @id @default(uuid())
-  label        String
-  mailAccounts MailAccount[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id                String        @id @default(uuid())
+  label             String
+  // 一个 QQ 下的数字、字母、Foxmail 三个邮箱共用同一个 QQ 邮箱授权码，
+  // 所以授权码只存在分组上，不再按邮箱各存一份
+  encryptedAuthCode String
+  mailAccounts      MailAccount[]
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 }
 
 model MailAccount {
@@ -84,7 +87,6 @@ model MailAccount {
   imapHost          String    @default("imap.qq.com")
   imapPort          Int       @default(993)
   username          String
-  encryptedAuthCode String
   qqGroupId         String
   qqGroup           QqGroup   @relation(fields: [qqGroupId], references: [id], onDelete: Cascade)
   // numeric = 数字 QQ 邮箱，letter = 字母 QQ 邮箱，foxmail = Foxmail 邮箱

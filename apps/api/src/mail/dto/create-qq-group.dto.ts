@@ -13,6 +13,7 @@ export class CreateQqGroupDto {
   @MaxLength(100)
   email: string;
 
+  // 一个 QQ 的总授权码，数字、字母、Foxmail 三个邮箱共用
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
@@ -26,11 +27,6 @@ export class AddMailboxDto {
   @IsEmail()
   @MaxLength(100)
   email: string;
-
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
-  authCode: string;
 
   @IsIn(MAILBOX_TYPES)
   mailboxType: MailboxType;

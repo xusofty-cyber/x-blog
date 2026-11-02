@@ -8,8 +8,12 @@ import { AddMailboxDto, CreateQqGroupDto } from './dto/create-qq-group.dto';
 import { UpdateMailboxDto, UpdateQqGroupDto } from './dto/update-qq-group.dto';
 
 function publicAccount(a: any) {
-  const { encryptedAuthCode, ...rest } = a;
-  return rest;
+  return a;
+}
+
+function publicGroup(g: any) {
+  const { encryptedAuthCode, mailAccounts, ...rest } = g;
+  return { ...rest, mailboxes: mailAccounts.map(publicAccount) };
 }
 
 @Injectable()
@@ -47,11 +51,7 @@ export class MailService {
       orderBy: { createdAt: 'asc' },
       include: { mailAccounts: { orderBy: { createdAt: 'asc' } } },
     });
-    return groups.map((g: any) => ({
-      ...g,
-      mailboxes: g.mailAccounts.map(publicAccount),
-      mailAccounts: undefined,
-    }));
+    return groups.map(publicGroup);
   }
 
   private async getGroupOrThrow(id: string) {
@@ -73,6 +73,7 @@ export class MailService {
     const group = await this.prisma.qqGroup.create({
       data: {
         label: dto.label.trim(),
+        encryptedAuthCode: this.crypto.encrypt(creds.authCode),
         mailAccounts: {
           create: {
             label: dto.label.trim(),
@@ -80,7 +81,6 @@ export class MailService {
             imapHost: creds.imapHost,
             imapPort: creds.imapPort,
             username: email,
-            encryptedAuthCode: this.crypto.encrypt(creds.authCode),
             mailboxType: dto.mailboxType,
             lastTestedAt: new Date(),
             lastError: null,
@@ -89,17 +89,42 @@ export class MailService {
       },
       include: { mailAccounts: { orderBy: { createdAt: 'asc' } } },
     });
-    return { ...group, mailboxes: group.mailAccounts.map(publicAccount), mailAccounts: undefined };
+    return publicGroup(group);
   }
 
   async updateGroup(id: string, dto: UpdateQqGroupDto) {
-    await this.getGroupOrThrow(id);
+    const group = await this.getGroupOrThrow(id);
+    const data: any = {};
+    if (dto.label !== undefined && dto.label.trim() !== '') data.label = dto.label.trim();
+    if (dto.authCode !== undefined && dto.authCode.trim() !== '') {
+      const newAuthCode = dto.authCode.trim();
+      // 总授权码换了：用组下所有邮箱各测一次登录，任何一个失败都不保存
+      for (const m of group.mailAccounts) {
+        try {
+          await this.imap.testConnection({
+            imapHost: m.imapHost,
+            imapPort: m.imapPort,
+            username: m.email,
+            authCode: newAuthCode,
+          });
+        } catch {
+          throw new BadRequestException(`用新授权码登录 ${m.email} 失败，请检查该邮箱是否属于该 QQ、或授权码是否正确`);
+        }
+      }
+      data.encryptedAuthCode = this.crypto.encrypt(newAuthCode);
+    }
     const updated = await this.prisma.qqGroup.update({
       where: { id },
-      data: { label: dto.label.trim() },
+      data,
       include: { mailAccounts: { orderBy: { createdAt: 'asc' } } },
     });
-    return { ...updated, mailboxes: updated.mailAccounts.map(publicAccount), mailAccounts: undefined };
+    if (data.encryptedAuthCode) {
+      await this.prisma.mailAccount.updateMany({
+        where: { qqGroupId: id },
+        data: { lastTestedAt: new Date(), lastError: null },
+      });
+    }
+    return publicGroup(updated);
   }
 
   async deleteGroup(id: string) {
@@ -120,16 +145,20 @@ export class MailService {
     const email = dto.email.trim().toLowerCase();
     const existing = await this.prisma.mailAccount.findUnique({ where: { email } });
     if (existing) throw new ConflictException('该邮箱已经添加过');
-    const creds = { imapHost: 'imap.qq.com', imapPort: 993, username: email, authCode: dto.authCode.trim() };
-    await this.imap.testConnection(creds);
+    // 新邮箱共用该 QQ 的总授权码，不再单独填授权码
+    const groupAuthCode = this.crypto.decrypt(group.encryptedAuthCode);
+    try {
+      await this.imap.testConnection({ imapHost: 'imap.qq.com', imapPort: 993, username: email, authCode: groupAuthCode });
+    } catch {
+      throw new BadRequestException(`用该 QQ 的总授权码登录 ${email} 失败，请检查该邮箱是否属于该 QQ、或先更新 QQ 的总授权码`);
+    }
     const created = await this.prisma.mailAccount.create({
       data: {
         label: group.label,
         email,
-        imapHost: creds.imapHost,
-        imapPort: creds.imapPort,
+        imapHost: 'imap.qq.com',
+        imapPort: 993,
         username: email,
-        encryptedAuthCode: this.crypto.encrypt(creds.authCode),
         mailboxType: dto.mailboxType,
         qqGroupId: groupId,
         lastTestedAt: new Date(),
@@ -143,7 +172,6 @@ export class MailService {
     const account = await this.getAccountOrThrow(id);
     const data: any = {};
     let newEmail = account.email;
-    let newAuthCode: string | null = null;
     if (dto.email !== undefined) {
       newEmail = dto.email.trim().toLowerCase();
       if (newEmail !== account.email) {
@@ -160,19 +188,21 @@ export class MailService {
       }
       data.mailboxType = dto.mailboxType;
     }
-    if (dto.authCode !== undefined && dto.authCode.trim() !== '') {
-      newAuthCode = dto.authCode.trim();
-    }
-    // 邮箱或授权码变了才重测 IMAP；只改类型不重测，避免无谓登录
-    if (newEmail !== account.email || newAuthCode !== null) {
-      const authCode = newAuthCode ?? this.crypto.decrypt(account.encryptedAuthCode);
-      await this.imap.testConnection({
-        imapHost: account.imapHost,
-        imapPort: account.imapPort,
-        username: newEmail,
-        authCode,
-      });
-      if (newAuthCode !== null) data.encryptedAuthCode = this.crypto.encrypt(newAuthCode);
+    // 邮箱变了才重测 IMAP，用该 QQ 的总授权码测；只改类型不重测
+    if (newEmail !== account.email) {
+      const group = await this.prisma.qqGroup.findUnique({ where: { id: account.qqGroupId } });
+      if (!group) throw new NotFoundException('未找到该 QQ');
+      const groupAuthCode = this.crypto.decrypt(group.encryptedAuthCode);
+      try {
+        await this.imap.testConnection({
+          imapHost: account.imapHost,
+          imapPort: account.imapPort,
+          username: newEmail,
+          authCode: groupAuthCode,
+        });
+      } catch {
+        throw new BadRequestException(`用该 QQ 的总授权码登录 ${newEmail} 失败，请检查该邮箱是否属于该 QQ、或先更新 QQ 的总授权码`);
+      }
       data.lastTestedAt = new Date();
       data.lastError = null;
     }
@@ -192,21 +222,13 @@ export class MailService {
   }
 
   async updateAccount(id: string, dto: UpdateMailAccountDto) {
+    // 旧接口保留兼容：授权码现在是分组总码，改码走分组更新（用组下所有邮箱各测一次）
     const account = await this.getAccountOrThrow(id);
+    if (dto.authCode !== undefined && dto.authCode.trim() !== '') {
+      await this.updateGroup(account.qqGroupId, { authCode: dto.authCode });
+    }
     const data: any = {};
     if (dto.label !== undefined) data.label = dto.label.trim();
-    if (dto.authCode !== undefined) {
-      const authCode = dto.authCode.trim();
-      await this.imap.testConnection({
-        imapHost: account.imapHost,
-        imapPort: account.imapPort,
-        username: account.username,
-        authCode,
-      });
-      data.encryptedAuthCode = this.crypto.encrypt(authCode);
-      data.lastTestedAt = new Date();
-      data.lastError = null;
-    }
     const updated = await this.prisma.mailAccount.update({ where: { id }, data });
     return publicAccount(updated);
   }
@@ -218,13 +240,15 @@ export class MailService {
 
   private async credsFor(id: string) {
     const account = await this.getAccountOrThrow(id);
+    const group = await this.prisma.qqGroup.findUnique({ where: { id: account.qqGroupId } });
+    if (!group) throw new NotFoundException('未找到该 QQ');
     return {
       account,
       creds: {
         imapHost: account.imapHost,
         imapPort: account.imapPort,
         username: account.username,
-        authCode: this.crypto.decrypt(account.encryptedAuthCode),
+        authCode: this.crypto.decrypt(group.encryptedAuthCode),
       },
     };
   }
@@ -242,6 +266,12 @@ export class MailService {
   async markRead(id: string, uid: number) {
     const { creds } = await this.credsFor(id);
     await this.imap.markRead(creds, uid);
+    return { ok: true };
+  }
+
+  async deleteMessage(id: string, uid: number) {
+    const { creds } = await this.credsFor(id);
+    await this.imap.deleteMessage(creds, uid);
     return { ok: true };
   }
 

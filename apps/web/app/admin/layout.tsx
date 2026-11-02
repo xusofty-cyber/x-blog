@@ -112,8 +112,8 @@ function AdminLayoutInner({
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Sidebar */}
-      <aside className="w-64 bg-zinc-950 border-r border-border text-zinc-300 flex flex-col justify-between shrink-0 shadow-lg">
+      {/* Sidebar：固定视口高度、随页面滚动时仍停在左侧，不再随主内容拉长而下方留白 */}
+      <aside className="w-64 bg-zinc-950 border-r border-border text-zinc-300 flex flex-col justify-between shrink-0 shadow-lg sticky top-0 h-screen self-start">
         <div className="min-h-0 flex-1 overflow-y-auto">
           {/* Brand */}
           <div className="h-16 flex items-center px-6 border-b border-zinc-800 gap-3">
@@ -150,7 +150,7 @@ function AdminLayoutInner({
                       <span aria-hidden>{mailListExpanded ? '▾' : '▸'}</span>
                     </button>
                     {mailListExpanded && (
-                      <div className="mt-1 ml-2 space-y-3 max-h-[45vh] overflow-y-auto pr-1">
+                      <div className="mt-1 ml-2 space-y-3 pr-1">
                         {groups.map((g) => (
                           <div key={g.id} className="rounded-btn bg-zinc-900/60 p-2">
                             <div className="flex items-center justify-between gap-2">

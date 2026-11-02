@@ -32,7 +32,7 @@ export interface MailDetail extends MailListItem {
 }
 
 /**
- * IMAP 访问层（v1，只读 + 标记已读）。
+ * IMAP 访问层（v1，只读 + 标记已读；v3 起支持删除邮件）。
  * 每次请求新建连接、用完即断开，不做连接池，避免陈旧连接与 QQ 频率问题。
  * 授权码只在连接时使用，绝不写日志。
  */
@@ -212,6 +212,18 @@ export class ImapService {
     await this.withClient(creds, async (client) => {
       await client.mailboxOpen('INBOX');
       await client.messageFlagsAdd(uid, ['\\Seen'], { uid: true });
+    });
+  }
+
+  async deleteMessage(creds: MailAccountCredentials, uid: number): Promise<void> {
+    await this.withClient(creds, async (client) => {
+      await client.mailboxOpen('INBOX');
+      // 先打上 \Deleted，再按 UID 清除；QQ 邮箱侧一般会进已删除，具体以 QQ 邮箱为准
+      await client.messageFlagsAdd(uid, ['\\Deleted'], { uid: true });
+      const ok = await client.messageDelete(uid, { uid: true });
+      if (ok === false) {
+        throw new BadGatewayException('未找到该邮件，可能已被删除');
+      }
     });
   }
 

@@ -100,6 +100,11 @@ export class MailController {
     return this.mailService.markRead(id, parseInt(uidRaw, 10));
   }
 
+  @Delete('accounts/:id/messages/:uid')
+  deleteMessage(@Param('id') id: string, @Param('uid') uidRaw: string) {
+    return this.mailService.deleteMessage(id, parseInt(uidRaw, 10));
+  }
+
   @Get('accounts/:id/messages/:uid/attachments/:index')
   async getAttachment(
     @Param('id') id: string,

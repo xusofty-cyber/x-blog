@@ -67,26 +67,24 @@ export default function AdminMailPage() {
   const [newAuthCode, setNewAuthCode] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
-  // 编辑面板本地状态：组名、每个邮箱的邮箱/类型/新授权码（空 = 保留原授权码）
+  // 编辑面板本地状态：组名、总授权码（空 = 保留原授权码）、每个邮箱的邮箱/类型
   const editGroup = groups.find((g) => g.id === editGroupId) || null;
   const [editLabel, setEditLabel] = useState('');
+  const [editGroupAuthCode, setEditGroupAuthCode] = useState('');
   const [editMailboxEmail, setEditMailboxEmail] = useState<Record<string, string>>({});
   const [editMailboxType, setEditMailboxType] = useState<Record<string, string>>({});
-  const [editMailboxAuth, setEditMailboxAuth] = useState<Record<string, string>>({});
   const [addEmail, setAddEmail] = useState('');
   const [addType, setAddType] = useState('letter');
-  const [addAuthCode, setAddAuthCode] = useState('');
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     if (editGroup) {
       setEditLabel(editGroup.label);
+      setEditGroupAuthCode('');
       setEditMailboxEmail(Object.fromEntries(editGroup.mailboxes.map((m) => [m.id, m.email])));
       setEditMailboxType(Object.fromEntries(editGroup.mailboxes.map((m) => [m.id, m.mailboxType])));
-      setEditMailboxAuth({});
       setAddEmail('');
       setAddType(editGroup.mailboxes.length === 0 ? 'numeric' : 'letter');
-      setAddAuthCode('');
     }
   }, [editGroup]);
 
@@ -174,18 +172,21 @@ export default function AdminMailPage() {
     }
   };
 
-  const handleSaveGroupLabel = async () => {
+  const handleSaveGroup = async () => {
     if (!editGroup || !editLabel.trim()) return;
     setErrorMessage('');
     setSuccessMessage('');
     setIsEditing(true);
     try {
+      const body: Record<string, string> = { label: editLabel.trim() };
+      if (editGroupAuthCode.trim()) body.authCode = editGroupAuthCode.trim();
       await apiFetch(`/api/mail/groups/${editGroup.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: editLabel.trim() }),
+        body: JSON.stringify(body),
       });
-      setSuccessMessage('QQ 备注名已更新');
+      setEditGroupAuthCode('');
+      setSuccessMessage('QQ 信息已更新（换总授权码时会用组下所有邮箱各测一次登录）');
       await refreshGroups();
     } catch (err) {
       setErrorMessage(errText(err));
@@ -203,14 +204,12 @@ export default function AdminMailPage() {
       const body: Record<string, string> = {};
       if (editMailboxEmail[mailboxId] !== undefined) body.email = editMailboxEmail[mailboxId].trim();
       if (editMailboxType[mailboxId] !== undefined) body.mailboxType = editMailboxType[mailboxId];
-      if (editMailboxAuth[mailboxId]?.trim()) body.authCode = editMailboxAuth[mailboxId].trim();
       await apiFetch(`/api/mail/mailboxes/${mailboxId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      setEditMailboxAuth((prev) => ({ ...prev, [mailboxId]: '' }));
-      setSuccessMessage('该邮箱已更新（改了邮箱或授权码时会先测 IMAP 登录）');
+      setSuccessMessage('该邮箱已更新（改了邮箱时会用该 QQ 的总授权码先测 IMAP 登录）');
       await refreshGroups();
     } catch (err) {
       setErrorMessage(errText(err));
@@ -220,8 +219,8 @@ export default function AdminMailPage() {
   };
 
   const handleAddMailbox = async () => {
-    if (!editGroup || !addEmail.trim() || !addAuthCode.trim()) {
-      setErrorMessage('要添加的邮箱与授权码都要填');
+    if (!editGroup || !addEmail.trim()) {
+      setErrorMessage('要添加的邮箱要填');
       return;
     }
     setErrorMessage('');
@@ -231,16 +230,34 @@ export default function AdminMailPage() {
       await apiFetch(`/api/mail/groups/${editGroup.id}/mailboxes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: addEmail.trim(), mailboxType: addType, authCode: addAuthCode.trim() }),
+        body: JSON.stringify({ email: addEmail.trim(), mailboxType: addType }),
       });
       setAddEmail('');
-      setAddAuthCode('');
-      setSuccessMessage('已给该 QQ 添加一个邮箱，IMAP 登录测试通过');
+      setSuccessMessage('已给该 QQ 添加一个邮箱，用总授权码登录测试通过');
       await refreshGroups();
     } catch (err) {
       setErrorMessage(errText(err));
     } finally {
       setIsEditing(false);
+    }
+  };
+
+  const handleDeleteMessage = async (uid: number) => {
+    if (!selectedMailboxId) return;
+    if (!window.confirm('确定要删除这封邮件吗？删除后它将从收件箱消失，QQ 邮箱里一般可在已删除里找回，具体以 QQ 邮箱为准。')) return;
+    setErrorMessage('');
+    setSuccessMessage('');
+    try {
+      await apiFetch(`/api/mail/accounts/${selectedMailboxId}/messages/${uid}`, { method: 'DELETE' });
+      if (detail?.uid === uid) setDetail(null);
+      setSuccessMessage('已删除该邮件');
+      if (messages.length === 1 && page > 1) {
+        setPage(page - 1);
+      } else {
+        await loadMessages();
+      }
+    } catch (err) {
+      setErrorMessage(errText(err));
     }
   };
 
@@ -295,7 +312,8 @@ export default function AdminMailPage() {
         <h1 className="text-2xl font-bold text-foreground">邮箱管理</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           左侧“邮箱管理”下方是按 QQ 分组的邮箱列表，点一个邮箱就切换到它；点“邮箱管理”可以把列表收起来或展开。
-          第一版只读加标记已读，不发件、不删除、不移动邮件。授权码只在添加或更新时提交给后端加密保存，不会在页面上回显。
+          一个 QQ 的数字、字母、Foxmail 三个邮箱共用一个总授权码。邮件可以删除，删除前会二次确认。
+          授权码只在添加或更新时提交给后端加密保存，不会在页面上回显。
         </p>
       </div>
 
@@ -345,7 +363,7 @@ export default function AdminMailPage() {
             type="password"
             value={newAuthCode}
             onChange={(e) => setNewAuthCode(e.target.value)}
-            placeholder="QQ 邮箱授权码（非 QQ 密码）"
+            placeholder="QQ 总授权码（非 QQ 密码，三个邮箱共用）"
             maxLength={100}
             autoComplete="off"
             className="rounded-btn border border-border px-3 py-2 text-sm bg-background"
@@ -359,7 +377,7 @@ export default function AdminMailPage() {
           </button>
         </form>
         <p className="mt-2 text-xs text-muted-foreground">
-          添加前请先在 QQ 邮箱设置里开启 IMAP 服务并生成授权码；添加时会先测一次 IMAP 登录，通了才保存。一个 QQ 之后最多再加 2 个邮箱（数字、字母、Foxmail 各一）。
+          添加前请先在 QQ 邮箱设置里开启 IMAP 服务并生成授权码；添加时会先测一次 IMAP 登录，通了才保存。一个 QQ 之后最多再加 2 个邮箱（数字、字母、Foxmail 各一），新邮箱共用该 QQ 的总授权码，不用再填授权码。
         </p>
       </div>
 
@@ -372,27 +390,35 @@ export default function AdminMailPage() {
             </button>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            更新动作很少用，所以平时不显示在这里，只有在左侧列表点“更新”时才出现。授权码留空表示保留原来的，不会清空。
+            更新动作很少用，所以平时不显示在这里，只有在左侧列表点“更新”时才出现。一个 QQ 只有一个总授权码，三个邮箱共用；总授权码留空表示保留原来的，不会清空。
           </p>
-          <div className="mt-4 flex gap-2">
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
             <input
               value={editLabel}
               onChange={(e) => setEditLabel(e.target.value)}
               placeholder="QQ 备注名"
               maxLength={50}
-              className="flex-1 rounded-btn border border-border px-3 py-2 text-sm bg-background"
+              className="rounded-btn border border-border px-3 py-2 text-sm bg-background"
+            />
+            <input
+              type="password"
+              value={editGroupAuthCode}
+              onChange={(e) => setEditGroupAuthCode(e.target.value)}
+              placeholder="新总授权码，留空保留原授权码"
+              autoComplete="off"
+              className="rounded-btn border border-border px-3 py-2 text-sm bg-background"
             />
             <button
-              onClick={handleSaveGroupLabel}
+              onClick={handleSaveGroup}
               disabled={isEditing}
               className="rounded-btn border border-border px-4 py-2 text-sm font-semibold disabled:opacity-50"
             >
-              保存备注名
+              保存 QQ 信息
             </button>
           </div>
           <div className="mt-4 space-y-3">
             {editGroup.mailboxes.map((m) => (
-              <div key={m.id} className="grid gap-2 sm:grid-cols-5 rounded-xl border border-border p-3">
+              <div key={m.id} className="grid gap-2 sm:grid-cols-4 rounded-xl border border-border p-3">
                 <input
                   value={editMailboxEmail[m.id] ?? m.email}
                   onChange={(e) => setEditMailboxEmail((prev) => ({ ...prev, [m.id]: e.target.value }))}
@@ -407,14 +433,6 @@ export default function AdminMailPage() {
                   <option value="letter">字母邮箱</option>
                   <option value="foxmail">Foxmail 邮箱</option>
                 </select>
-                <input
-                  type="password"
-                  value={editMailboxAuth[m.id] ?? ''}
-                  onChange={(e) => setEditMailboxAuth((prev) => ({ ...prev, [m.id]: e.target.value }))}
-                  placeholder="新授权码，留空保留原授权码"
-                  autoComplete="off"
-                  className="rounded-btn border border-border px-3 py-2 text-sm bg-background"
-                />
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleSaveMailbox(m.id)}
@@ -434,11 +452,11 @@ export default function AdminMailPage() {
             ))}
           </div>
           {editGroup.mailboxes.length < 3 ? (
-            <div className="mt-4 grid gap-2 sm:grid-cols-5">
+            <div className="mt-4 grid gap-2 sm:grid-cols-4">
               <input
                 value={addEmail}
                 onChange={(e) => setAddEmail(e.target.value)}
-                placeholder="给该 QQ 再加一个邮箱"
+                placeholder="给该 QQ 再加一个邮箱（共用总授权码）"
                 className="rounded-btn border border-border px-3 py-2 text-sm bg-background sm:col-span-2"
               />
               <select
@@ -450,14 +468,6 @@ export default function AdminMailPage() {
                 <option value="letter">字母邮箱</option>
                 <option value="foxmail">Foxmail 邮箱</option>
               </select>
-              <input
-                type="password"
-                value={addAuthCode}
-                onChange={(e) => setAddAuthCode(e.target.value)}
-                placeholder="该邮箱的授权码"
-                autoComplete="off"
-                className="rounded-btn border border-border px-3 py-2 text-sm bg-background"
-              />
               <button
                 onClick={handleAddMailbox}
                 disabled={isEditing}
@@ -515,10 +525,10 @@ export default function AdminMailPage() {
             </p>
             <ul className="mt-3 divide-y divide-border">
               {messages.map((m) => (
-                <li key={m.uid}>
+                <li key={m.uid} className="flex items-start gap-1">
                   <button
                     onClick={() => openMessage(m.uid)}
-                    className={`w-full text-left px-2 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-900 rounded-btn ${
+                    className={`flex-1 min-w-0 text-left px-2 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-900 rounded-btn ${
                       detail?.uid === m.uid ? 'bg-zinc-100 dark:bg-zinc-900' : ''
                     }`}
                   >
@@ -530,6 +540,13 @@ export default function AdminMailPage() {
                     <span className="block text-xs text-muted-foreground mt-0.5">
                       {m.date ? new Date(m.date).toLocaleString('zh-CN') : ''}
                     </span>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteMessage(m.uid)}
+                    title="删除这封邮件"
+                    className="mt-3 shrink-0 rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                  >
+                    删除
                   </button>
                 </li>
               ))}
@@ -563,7 +580,15 @@ export default function AdminMailPage() {
               <p className="text-sm text-muted-foreground">点左侧一封邮件查看正文。</p>
             ) : (
               <article>
-                <h2 className="text-lg font-bold">{detail.subject}</h2>
+                <div className="flex items-start justify-between gap-3">
+                  <h2 className="text-lg font-bold">{detail.subject}</h2>
+                  <button
+                    onClick={() => handleDeleteMessage(detail.uid)}
+                    className="shrink-0 rounded-btn border border-red-200 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                  >
+                    删除这封邮件
+                  </button>
+                </div>
                 <p className="mt-2 text-xs text-muted-foreground break-words">发件人：{detail.from}</p>
                 <p className="mt-1 text-xs text-muted-foreground break-words">收件人：{detail.to || selectedMailbox.email}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
