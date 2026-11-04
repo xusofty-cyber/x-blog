@@ -16,6 +16,22 @@ function publicGroup(g: any) {
   return { ...rest, mailboxes: mailAccounts.map(publicAccount) };
 }
 
+// 服务商由邮箱域名推断，不新增数据库迁移：
+// - @163.com -> imap.163.com（网易 163，客户端授权密码，非登录密码）
+// - QQ 系（@qq.com、@foxmail.com）-> imap.qq.com，与之前保持一致
+// 163 分组与 QQ 分组绝不能混在一个组里，否则共用一个授权码时必有一方登录失败。
+function imapHostForEmail(email: string): string {
+  return email.trim().toLowerCase().endsWith('@163.com') ? 'imap.163.com' : 'imap.qq.com';
+}
+
+function is163Email(email: string): boolean {
+  return email.trim().toLowerCase().endsWith('@163.com');
+}
+
+function is163Mailbox(m: any): boolean {
+  return m.mailboxType === '163' || is163Email(m.email);
+}
+
 @Injectable()
 export class MailService {
   constructor(
@@ -67,7 +83,14 @@ export class MailService {
     const email = dto.email.trim().toLowerCase();
     const existing = await this.prisma.mailAccount.findUnique({ where: { email } });
     if (existing) throw new ConflictException('该邮箱已经添加过');
-    const creds = { imapHost: 'imap.qq.com', imapPort: 993, username: email, authCode: dto.authCode.trim() };
+    // 类型与域名必须一致，防止把 163 邮箱建进 QQ 组（或反之），否则共用授权码必失败
+    if (dto.mailboxType === '163' && !is163Email(email)) {
+      throw new BadRequestException('163 类型的邮箱必须以 @163.com 结尾');
+    }
+    if (dto.mailboxType !== '163' && is163Email(email)) {
+      throw new BadRequestException('163 邮箱请用 163 类型新建分组，不能放进 QQ 分组');
+    }
+    const creds = { imapHost: imapHostForEmail(email), imapPort: 993, username: email, authCode: dto.authCode.trim() };
     // 先测 IMAP 登录，通了才保存；失败时不落库，避免存错授权码
     await this.imap.testConnection(creds);
     const group = await this.prisma.qqGroup.create({
@@ -108,7 +131,7 @@ export class MailService {
             authCode: newAuthCode,
           });
         } catch {
-          throw new BadRequestException(`用新授权码登录 ${m.email} 失败，请检查该邮箱是否属于该 QQ、或授权码是否正确`);
+          throw new BadRequestException(`用新授权码登录 ${m.email} 失败，请检查该邮箱是否属于该组、或授权码是否正确`);
         }
       }
       data.encryptedAuthCode = this.crypto.encrypt(newAuthCode);
@@ -136,27 +159,41 @@ export class MailService {
 
   async addMailbox(groupId: string, dto: AddMailboxDto) {
     const group = await this.getGroupOrThrow(groupId);
-    if (group.mailAccounts.length >= 3) {
-      throw new BadRequestException('一个 QQ 最多配置 3 个邮箱');
+    const groupIs163 = group.mailAccounts.some((m: any) => is163Mailbox(m));
+    // 163 分组只能有 1 个邮箱，且不能与 QQ 邮箱混组；QQ 分组最多 3 个、每类型一个
+    if (groupIs163) {
+      if (dto.mailboxType !== '163' || group.mailAccounts.length >= 1) {
+        throw new BadRequestException('163 分组只能有 1 个邮箱，不能再加其他邮箱');
+      }
+    } else {
+      if (dto.mailboxType === '163') {
+        throw new BadRequestException('163 邮箱请新建 163 分组，不能加进 QQ 分组');
+      }
+      if (group.mailAccounts.length >= 3) {
+        throw new BadRequestException('一个 QQ 最多配置 3 个邮箱');
+      }
     }
     if (group.mailAccounts.some((m: any) => m.mailboxType === dto.mailboxType)) {
-      throw new BadRequestException('该 QQ 下已有同类型的邮箱');
+      throw new BadRequestException('该组下已有同类型的邮箱');
     }
     const email = dto.email.trim().toLowerCase();
     const existing = await this.prisma.mailAccount.findUnique({ where: { email } });
     if (existing) throw new ConflictException('该邮箱已经添加过');
-    // 新邮箱共用该 QQ 的总授权码，不再单独填授权码
+    if (groupIs163 !== is163Email(email)) {
+      throw new BadRequestException('不能把不同服务商的邮箱加进同一个分组');
+    }
+    // 新邮箱共用该组的总授权码，不再单独填授权码
     const groupAuthCode = this.crypto.decrypt(group.encryptedAuthCode);
     try {
-      await this.imap.testConnection({ imapHost: 'imap.qq.com', imapPort: 993, username: email, authCode: groupAuthCode });
+      await this.imap.testConnection({ imapHost: imapHostForEmail(email), imapPort: 993, username: email, authCode: groupAuthCode });
     } catch {
-      throw new BadRequestException(`用该 QQ 的总授权码登录 ${email} 失败，请检查该邮箱是否属于该 QQ、或先更新 QQ 的总授权码`);
+      throw new BadRequestException(`用该组的授权码登录 ${email} 失败，请检查该邮箱是否属于该组、或先更新该组的授权码`);
     }
     const created = await this.prisma.mailAccount.create({
       data: {
         label: group.label,
         email,
-        imapHost: 'imap.qq.com',
+        imapHost: imapHostForEmail(email),
         imapPort: 993,
         username: email,
         mailboxType: dto.mailboxType,
@@ -184,24 +221,32 @@ export class MailService {
     if (dto.mailboxType !== undefined) {
       const siblings = await this.prisma.mailAccount.findMany({ where: { qqGroupId: account.qqGroupId } });
       if (siblings.some((m: any) => m.id !== id && m.mailboxType === dto.mailboxType)) {
-        throw new BadRequestException('该 QQ 下已有同类型的邮箱');
+        throw new BadRequestException('该组下已有同类型的邮箱');
+      }
+      // 不能把类型改成不同服务商的类型（QQ <-> 163），否则共用授权码必失败
+      if ((dto.mailboxType === '163') !== is163Mailbox(account)) {
+        throw new BadRequestException('不能把邮箱类型改成不同服务商的类型，请删除后按新服务商重新添加');
       }
       data.mailboxType = dto.mailboxType;
     }
-    // 邮箱变了才重测 IMAP，用该 QQ 的总授权码测；只改类型不重测
+    // 邮箱变了才重测 IMAP，用该组的总授权码测；只改类型不重测
     if (newEmail !== account.email) {
+      // 不能把邮箱改成不同服务商的邮箱
+      if (is163Email(newEmail) !== is163Mailbox(account)) {
+        throw new BadRequestException('不能把邮箱改成不同服务商的邮箱，请删除后按新服务商重新添加');
+      }
       const group = await this.prisma.qqGroup.findUnique({ where: { id: account.qqGroupId } });
-      if (!group) throw new NotFoundException('未找到该 QQ');
+      if (!group) throw new NotFoundException('未找到该组');
       const groupAuthCode = this.crypto.decrypt(group.encryptedAuthCode);
       try {
         await this.imap.testConnection({
-          imapHost: account.imapHost,
+          imapHost: imapHostForEmail(newEmail),
           imapPort: account.imapPort,
           username: newEmail,
           authCode: groupAuthCode,
         });
       } catch {
-        throw new BadRequestException(`用该 QQ 的总授权码登录 ${newEmail} 失败，请检查该邮箱是否属于该 QQ、或先更新 QQ 的总授权码`);
+        throw new BadRequestException(`用该组的授权码登录 ${newEmail} 失败，请检查该邮箱是否属于该组、或先更新该组的授权码`);
       }
       data.lastTestedAt = new Date();
       data.lastError = null;

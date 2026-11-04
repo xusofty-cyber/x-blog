@@ -145,7 +145,7 @@ export default function AdminMailPage() {
     setErrorMessage('');
     setSuccessMessage('');
     if (!newLabel.trim() || !newEmail.trim() || !newAuthCode.trim()) {
-      setErrorMessage('QQ 备注名、邮箱与授权码都要填');
+      setErrorMessage('备注名、邮箱与授权码都要填');
       return;
     }
     setIsAdding(true);
@@ -163,7 +163,11 @@ export default function AdminMailPage() {
       setNewLabel('');
       setNewEmail('');
       setNewAuthCode('');
-      setSuccessMessage('已添加该 QQ，IMAP 登录测试通过，左侧列表里可以切换它的邮箱');
+      setSuccessMessage(
+        newType === '163'
+          ? '已添加该 163 邮箱，IMAP 登录测试通过，左侧列表里可以切换它的邮箱'
+          : '已添加该 QQ，IMAP 登录测试通过，左侧列表里可以切换它的邮箱',
+      );
       await refreshGroups();
     } catch (err) {
       setErrorMessage(errText(err));
@@ -186,7 +190,7 @@ export default function AdminMailPage() {
         body: JSON.stringify(body),
       });
       setEditGroupAuthCode('');
-      setSuccessMessage('QQ 信息已更新（换总授权码时会用组下所有邮箱各测一次登录）');
+      setSuccessMessage('分组信息已更新（换授权码时会用组下所有邮箱各测一次登录）');
       await refreshGroups();
     } catch (err) {
       setErrorMessage(errText(err));
@@ -209,7 +213,7 @@ export default function AdminMailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      setSuccessMessage('该邮箱已更新（改了邮箱时会用该 QQ 的总授权码先测 IMAP 登录）');
+      setSuccessMessage('该邮箱已更新（改了邮箱时会用该组的授权码先测 IMAP 登录）');
       await refreshGroups();
     } catch (err) {
       setErrorMessage(errText(err));
@@ -233,7 +237,7 @@ export default function AdminMailPage() {
         body: JSON.stringify({ email: addEmail.trim(), mailboxType: addType }),
       });
       setAddEmail('');
-      setSuccessMessage('已给该 QQ 添加一个邮箱，用总授权码登录测试通过');
+      setSuccessMessage('已给该组添加一个邮箱，用组授权码登录测试通过');
       await refreshGroups();
     } catch (err) {
       setErrorMessage(errText(err));
@@ -262,7 +266,7 @@ export default function AdminMailPage() {
   };
 
   const handleDeleteMailbox = async (mailboxId: string, isLast: boolean) => {
-    if (!window.confirm(isLast ? '这是该 QQ 最后一个邮箱，删除后该 QQ 也会一起消失，确定吗？' : '确定要删除这个邮箱吗？只删除后台的配置，不会删除 QQ 邮箱里的邮件。')) return;
+    if (!window.confirm(isLast ? '这是该组最后一个邮箱，删除后该组也会一起消失，确定吗？' : '确定要删除这个邮箱吗？只删除后台的配置，不会删除邮箱里的邮件。')) return;
     setErrorMessage('');
     try {
       await apiFetch(`/api/mail/mailboxes/${mailboxId}`, { method: 'DELETE' });
@@ -275,7 +279,7 @@ export default function AdminMailPage() {
 
   const handleDeleteGroup = async () => {
     if (!editGroup) return;
-    if (!window.confirm('确定要删除该 QQ 吗？会同时删除它下面所有邮箱的后台配置，不会删除 QQ 邮箱里的邮件。')) return;
+    if (!window.confirm('确定要删除该组吗？会同时删除它下面所有邮箱的后台配置，不会删除邮箱里的邮件。')) return;
     setErrorMessage('');
     try {
       await apiFetch(`/api/mail/groups/${editGroup.id}`, { method: 'DELETE' });
@@ -311,8 +315,8 @@ export default function AdminMailPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">邮箱管理</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          左侧“邮箱管理”下方是按 QQ 分组的邮箱列表：点分组标题查看数字邮箱（数字邮箱就是 QQ 号，不再单列一行），点字母或 Foxmail 行查看对应邮箱；点“邮箱管理”可以把列表收起来或展开。
-          一个 QQ 的数字、字母、Foxmail 三个邮箱共用一个总授权码。邮件可以删除，删除前会二次确认。
+          左侧“邮箱管理”下方是按分组的邮箱列表：QQ 分组点分组标题查看数字邮箱（数字邮箱就是 QQ 号，不再单列一行），点字母或 Foxmail 行查看对应邮箱；163 分组只有一个邮箱，点分组标题即查看它；点“邮箱管理”可以把列表收起来或展开。
+          一个 QQ 的数字、字母、Foxmail 三个邮箱共用一个总授权码；163 分组只能有 1 个邮箱，用它自己的客户端授权密码，不能和 QQ 邮箱混在一个分组里。邮件可以删除，删除前会二次确认。
           授权码只在添加或更新时提交给后端加密保存，不会在页面上回显。
         </p>
       </div>
@@ -334,19 +338,19 @@ export default function AdminMailPage() {
       )}
 
       <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <h2 className="text-base font-semibold mb-4">添加 QQ</h2>
+        <h2 className="text-base font-semibold mb-4">添加邮箱分组</h2>
         <form onSubmit={handleAddGroup} className="grid gap-3 sm:grid-cols-5">
           <input
             value={newLabel}
             onChange={(e) => setNewLabel(e.target.value)}
-            placeholder="QQ 备注名，例如：主号"
+            placeholder={newType === '163' ? '备注名，例如：163主号' : 'QQ 备注名，例如：主号'}
             maxLength={50}
             className="rounded-btn border border-border px-3 py-2 text-sm bg-background"
           />
           <input
             value={newEmail}
             onChange={(e) => setNewEmail(e.target.value)}
-            placeholder="第一个邮箱，例如：123456@qq.com"
+            placeholder={newType === '163' ? '163 邮箱，例如：example@163.com' : '第一个邮箱，例如：123456@qq.com'}
             maxLength={100}
             className="rounded-btn border border-border px-3 py-2 text-sm bg-background"
           />
@@ -358,12 +362,17 @@ export default function AdminMailPage() {
             <option value="numeric">数字邮箱</option>
             <option value="letter">字母邮箱</option>
             <option value="foxmail">Foxmail 邮箱</option>
+            <option value="163">163 邮箱</option>
           </select>
           <input
             type="password"
             value={newAuthCode}
             onChange={(e) => setNewAuthCode(e.target.value)}
-            placeholder="QQ 总授权码（非 QQ 密码，三个邮箱共用）"
+            placeholder={
+              newType === '163'
+                ? '163 客户端授权密码（非 163 登录密码）'
+                : 'QQ 总授权码（非 QQ 密码，三个邮箱共用）'
+            }
             maxLength={100}
             autoComplete="off"
             className="rounded-btn border border-border px-3 py-2 text-sm bg-background"
@@ -377,26 +386,26 @@ export default function AdminMailPage() {
           </button>
         </form>
         <p className="mt-2 text-xs text-muted-foreground">
-          添加前请先在 QQ 邮箱设置里开启 IMAP 服务并生成授权码；添加时会先测一次 IMAP 登录，通了才保存。一个 QQ 之后最多再加 2 个邮箱（数字、字母、Foxmail 各一），新邮箱共用该 QQ 的总授权码，不用再填授权码。
+          添加前请先在对应邮箱设置里开启 IMAP 服务并生成授权码（QQ 在 QQ 邮箱设置里，163 在 163 网页邮箱设置里开启 IMAP 并生成客户端授权密码）；添加时会先测一次 IMAP 登录，通了才保存。一个 QQ 之后最多再加 2 个邮箱（数字、字母、Foxmail 各一），新邮箱共用该 QQ 的总授权码，不用再填授权码；163 分组只能有 1 个邮箱。
         </p>
       </div>
 
       {editGroup && (
         <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold">更新 QQ：{editGroup.label}</h2>
+            <h2 className="text-base font-semibold">更新分组：{editGroup.label}</h2>
             <button onClick={() => setEditGroupId('')} className="text-sm text-muted-foreground hover:underline">
               关闭
             </button>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            更新动作很少用，所以平时不显示在这里，只有在左侧列表点“更新”时才出现。一个 QQ 只有一个总授权码，三个邮箱共用；总授权码留空表示保留原来的，不会清空。
+            更新动作很少用，所以平时不显示在这里，只有在左侧列表点“更新”时才出现。一个分组只有一个授权码，QQ 分组下三个邮箱共用，163 分组只有 1 个邮箱；授权码留空表示保留原来的，不会清空。
           </p>
           <div className="mt-4 grid gap-2 sm:grid-cols-3">
             <input
               value={editLabel}
               onChange={(e) => setEditLabel(e.target.value)}
-              placeholder="QQ 备注名"
+              placeholder="备注名"
               maxLength={50}
               className="rounded-btn border border-border px-3 py-2 text-sm bg-background"
             />
@@ -404,7 +413,7 @@ export default function AdminMailPage() {
               type="password"
               value={editGroupAuthCode}
               onChange={(e) => setEditGroupAuthCode(e.target.value)}
-              placeholder="新总授权码，留空保留原授权码"
+              placeholder="新授权码，留空保留原授权码"
               autoComplete="off"
               className="rounded-btn border border-border px-3 py-2 text-sm bg-background"
             />
@@ -413,7 +422,7 @@ export default function AdminMailPage() {
               disabled={isEditing}
               className="rounded-btn border border-border px-4 py-2 text-sm font-semibold disabled:opacity-50"
             >
-              保存 QQ 信息
+              保存分组信息
             </button>
           </div>
           <div className="mt-4 space-y-3">
@@ -429,9 +438,15 @@ export default function AdminMailPage() {
                   onChange={(e) => setEditMailboxType((prev) => ({ ...prev, [m.id]: e.target.value }))}
                   className="rounded-btn border border-border px-3 py-2 text-sm bg-background"
                 >
-                  <option value="numeric">数字邮箱</option>
-                  <option value="letter">字母邮箱</option>
-                  <option value="foxmail">Foxmail 邮箱</option>
+                  {m.mailboxType === '163' ? (
+                    <option value="163">163 邮箱</option>
+                  ) : (
+                    <>
+                      <option value="numeric">数字邮箱</option>
+                      <option value="letter">字母邮箱</option>
+                      <option value="foxmail">Foxmail 邮箱</option>
+                    </>
+                  )}
                 </select>
                 <div className="flex gap-2">
                   <button
@@ -451,12 +466,12 @@ export default function AdminMailPage() {
               </div>
             ))}
           </div>
-          {editGroup.mailboxes.length < 3 ? (
+          {editGroup.mailboxes.length < (editGroup.mailboxes.some((m) => m.mailboxType === '163') ? 1 : 3) ? (
             <div className="mt-4 grid gap-2 sm:grid-cols-4">
               <input
                 value={addEmail}
                 onChange={(e) => setAddEmail(e.target.value)}
-                placeholder="给该 QQ 再加一个邮箱（共用总授权码）"
+                placeholder="给该组再加一个邮箱（共用组授权码）"
                 className="rounded-btn border border-border px-3 py-2 text-sm bg-background sm:col-span-2"
               />
               <select
@@ -477,11 +492,11 @@ export default function AdminMailPage() {
               </button>
             </div>
           ) : (
-            <p className="mt-4 text-xs text-muted-foreground">该 QQ 已有 3 个邮箱，达到上限。</p>
+            <p className="mt-4 text-xs text-muted-foreground">{editGroup.mailboxes.some((m) => m.mailboxType === '163') ? '该 163 分组已有 1 个邮箱，达到上限。' : '该 QQ 已有 3 个邮箱，达到上限。'}</p>
           )}
           <div className="mt-4 border-t border-border pt-3">
             <button onClick={handleDeleteGroup} className="text-xs text-red-500 hover:underline">
-              删除该 QQ（同时删除它下面所有邮箱的后台配置，不删 QQ 邮箱里的邮件）
+              删除该组（同时删除它下面所有邮箱的后台配置，不删邮箱里的邮件）
             </button>
           </div>
         </div>
@@ -489,7 +504,7 @@ export default function AdminMailPage() {
 
       {groups.length === 0 ? (
         <div className="rounded-2xl border border-border bg-card p-8 text-sm text-muted-foreground">
-          还没有添加任何 QQ，请先在上面添加一个 QQ。
+          还没有添加任何邮箱分组，请先在上面添加一个分组。
         </div>
       ) : !selectedMailbox ? (
         <div className="rounded-2xl border border-border bg-card p-8 text-sm text-muted-foreground">

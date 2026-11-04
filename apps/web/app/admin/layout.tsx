@@ -145,7 +145,7 @@ function AdminLayoutInner({
                       }`}
                     >
                       <span className="flex-1 text-left">
-                        {item.label}（{groups.length} 个 QQ）
+                        {item.label}（{groups.length} 个分组）
                       </span>
                       <span aria-hidden>{mailListExpanded ? '▾' : '▸'}</span>
                     </button>
@@ -156,13 +156,16 @@ function AdminLayoutInner({
                           // 点分组标题即查看数字邮箱（没有数字邮箱的组则查看该组第一个邮箱）
                           const numericMailbox = g.mailboxes.find((m) => m.mailboxType === 'numeric');
                           const defaultMailbox = numericMailbox ?? g.mailboxes[0];
-                          const visibleMailboxes = g.mailboxes.filter((m) => m.mailboxType !== 'numeric');
+                          // 163 分组只有 1 个邮箱，分组标题已代表它，不再在下方重复列一行
+                          const visibleMailboxes = g.mailboxes.filter(
+                            (m) => m.mailboxType !== 'numeric' && m.mailboxType !== '163',
+                          );
                           return (
                             <div key={g.id} className="rounded-btn bg-zinc-900/60 p-2">
                               <div className="flex items-center justify-between gap-2">
                                 <button
                                   type="button"
-                                  title={numericMailbox ? '点击查看数字邮箱' : '点击查看该 QQ 的邮箱'}
+                                  title={g.mailboxes.some((m) => m.mailboxType === '163') ? '点击查看 163 邮箱' : numericMailbox ? '点击查看数字邮箱' : '点击查看该组的邮箱'}
                                   onClick={() => defaultMailbox && openMailbox(defaultMailbox.id)}
                                   className={`flex-1 min-w-0 text-left rounded px-1.5 py-1 text-xs font-semibold truncate ${
                                     defaultMailbox && selectedMailboxId === defaultMailbox.id
@@ -205,7 +208,7 @@ function AdminLayoutInner({
                           );
                         })}
                         {groups.length === 0 && (
-                          <p className="px-2 py-1 text-xs text-zinc-500">暂无 QQ，去邮箱管理添加。</p>
+                          <p className="px-2 py-1 text-xs text-zinc-500">暂无邮箱分组，去邮箱管理添加。</p>
                         )}
                       </div>
                     )}

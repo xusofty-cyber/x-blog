@@ -23,6 +23,7 @@ export type MailGroup = {
 export function mailboxTypeLabel(t: string): string {
   if (t === 'foxmail') return 'Foxmail';
   if (t === 'letter') return '字母';
+  if (t === '163') return '163';
   return '数字';
 }
 
