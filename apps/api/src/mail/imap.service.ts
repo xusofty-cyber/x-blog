@@ -238,6 +238,7 @@ export class ImapService {
         subject: parsed.subject || '(无主题)',
         date: parsed.date ? new Date(parsed.date).toISOString() : this.toListItem(msg).date,
         seen: flags.has('\\Seen'),
+        messageId: this.toListItem(msg).messageId,
         text: typeof parsed.text === 'string' ? parsed.text : null,
         html: typeof parsed.html === 'string' ? parsed.html : null,
         attachments,
