@@ -6,6 +6,7 @@ import { CreateMailAccountDto } from './dto/create-mail-account.dto';
 import { UpdateMailAccountDto } from './dto/update-mail-account.dto';
 import { AddMailboxDto, CreateQqGroupDto } from './dto/create-qq-group.dto';
 import { UpdateMailboxDto, UpdateQqGroupDto } from './dto/update-qq-group.dto';
+import { dedupeUnifiedItems, UnifiedItem } from './unified-dedupe';
 
 function publicAccount(a: any) {
   return a;
@@ -315,18 +316,6 @@ export class MailService {
       orderBy: { createdAt: 'asc' },
       include: { mailAccounts: { orderBy: { createdAt: 'asc' } } },
     });
-    type UnifiedItem = {
-      mailboxId: string;
-      mailboxEmail: string;
-      mailboxType: string;
-      groupId: string;
-      groupLabel: string;
-      uid: number;
-      from: string;
-      subject: string;
-      date: string | null;
-      seen: boolean;
-    };
     const items: UnifiedItem[] = [];
     const failed: { mailboxId: string; email: string; groupLabel: string; error: string }[] = [];
     let mailboxesTotal = 0;
@@ -378,6 +367,7 @@ export class MailService {
               subject: m.subject,
               date: m.date,
               seen: m.seen,
+              messageId: m.messageId,
             });
           }
         } else {
@@ -388,9 +378,12 @@ export class MailService {
       });
     }
     items.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+    // 同一 QQ 的三个别名邮箱会拉到同一封：同一分组内去重，只留一份（代表份通常是数字邮箱）
+    const deduped = dedupeUnifiedItems(items);
     return {
-      items: items.slice(0, maxTotal),
-      total: items.length,
+      items: deduped.items.slice(0, maxTotal),
+      total: deduped.items.length,
+      duplicatesRemoved: deduped.duplicatesRemoved,
       since: since.toISOString(),
       checkedAt: now.toISOString(),
       mailboxesTotal,

@@ -103,6 +103,7 @@ export default function AdminMailPage() {
   // 全部新邮件（统一视图）状态
   const [unifiedItems, setUnifiedItems] = useState<UnifiedItem[]>([]);
   const [unifiedTotal, setUnifiedTotal] = useState(0);
+  const [unifiedDuplicates, setUnifiedDuplicates] = useState(0);
   const [unifiedSince, setUnifiedSince] = useState('');
   const [unifiedCheckedAt, setUnifiedCheckedAt] = useState('');
   const [unifiedMailboxes, setUnifiedMailboxes] = useState({ total: 0, ok: 0, failed: 0 });
@@ -191,6 +192,7 @@ export default function AdminMailPage() {
       const data = await apiFetch<{
         items: UnifiedItem[];
         total: number;
+        duplicatesRemoved?: number;
         since: string;
         checkedAt: string;
         mailboxesTotal: number;
@@ -200,6 +202,7 @@ export default function AdminMailPage() {
       }>(`/api/mail/recent?${qs.toString()}`);
       setUnifiedItems(data.items);
       setUnifiedTotal(data.total);
+      setUnifiedDuplicates(data.duplicatesRemoved || 0);
       setUnifiedSince(data.since);
       setUnifiedCheckedAt(data.checkedAt);
       setUnifiedMailboxes({ total: data.mailboxesTotal, ok: data.mailboxesOk, failed: data.mailboxesFailed });
@@ -738,7 +741,7 @@ export default function AdminMailPage() {
               {unifiedLoading
                 ? '正在逐个登录各邮箱拉取，请稍等（邮箱多时约十几秒）…'
                 : unifiedLoaded
-                  ? `范围：${unifiedSince ? new Date(unifiedSince).toLocaleString('zh-CN') : ''} 至今，共 ${unifiedTotal} 封，${unifiedMailboxes.ok}/${unifiedMailboxes.total} 个邮箱拉取成功`
+                  ? `范围：${unifiedSince ? new Date(unifiedSince).toLocaleString('zh-CN') : ''} 至今，共 ${unifiedTotal} 封，${unifiedMailboxes.ok}/${unifiedMailboxes.total} 个邮箱拉取成功${unifiedDuplicates > 0 ? `，已合并 ${unifiedDuplicates} 封重复（同一 QQ 的数字/字母/Foxmail 收到的是同一封）` : ''}`
                   : ''}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">

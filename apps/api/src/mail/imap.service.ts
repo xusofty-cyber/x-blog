@@ -15,6 +15,8 @@ export interface MailListItem {
   subject: string;
   date: string | null;
   seen: boolean;
+  // 信封里的 Message-ID（统一视图去重用：同一 QQ 的数字/字母/Foxmail 是同一收件箱的别名，同一封会拉到 3 次）
+  messageId: string | null;
 }
 
 export interface MailAttachmentMeta {
@@ -210,6 +212,7 @@ export class ImapService {
       subject: env.subject || '(无主题)',
       date: env.date ? new Date(env.date).toISOString() : null,
       seen: flags.has('\\Seen'),
+      messageId: typeof env.messageId === 'string' && env.messageId.trim() !== '' ? env.messageId.trim() : null,
     };
   }
 
