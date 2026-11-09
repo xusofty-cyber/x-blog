@@ -19,6 +19,42 @@ type MailDetail = MailListItem & {
   attachments: { index: number; filename: string; contentType: string; size: number }[];
 };
 
+type UnifiedItem = MailListItem & {
+  mailboxId: string;
+  mailboxEmail: string;
+  mailboxType: string;
+  groupId: string;
+  groupLabel: string;
+};
+
+type UnifiedFailed = { mailboxId: string; email: string; groupLabel: string; error: string };
+
+const LAST_CHECK_KEY = 'xblog_unified_last_check';
+const RANGE_LABELS: Record<string, string> = {
+  last: '自上次查看以来',
+  '24h': '最近 24 小时',
+  '72h': '最近 3 天',
+  '7d': '最近 7 天',
+};
+
+function computeSince(range: string): Date {
+  const now = Date.now();
+  if (range === '72h') return new Date(now - 72 * 60 * 60 * 1000);
+  if (range === '7d') return new Date(now - 7 * 24 * 60 * 60 * 1000);
+  if (range === 'last') {
+    try {
+      const saved = localStorage.getItem(LAST_CHECK_KEY);
+      if (saved) {
+        const d = new Date(saved);
+        if (!Number.isNaN(d.getTime())) return d;
+      }
+    } catch {
+      // 忽略本地存储异常
+    }
+  }
+  return new Date(now - 24 * 60 * 60 * 1000);
+}
+
 function errText(err: unknown): string {
   return err instanceof Error ? err.message : '请求失败';
 }
@@ -48,6 +84,8 @@ export default function AdminMailPage() {
     refreshGroups,
     editGroupId,
     setEditGroupId,
+    unifiedMode,
+    setUnifiedMode,
   } = useMailContext();
 
   const [messages, setMessages] = useState<MailListItem[]>([]);
@@ -57,9 +95,22 @@ export default function AdminMailPage() {
   const [q, setQ] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [detail, setDetail] = useState<MailDetail | null>(null);
+  const [detailMailboxId, setDetailMailboxId] = useState<string | null>(null);
   const [isMsgLoading, setIsMsgLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // 全部新邮件（统一视图）状态
+  const [unifiedItems, setUnifiedItems] = useState<UnifiedItem[]>([]);
+  const [unifiedTotal, setUnifiedTotal] = useState(0);
+  const [unifiedSince, setUnifiedSince] = useState('');
+  const [unifiedCheckedAt, setUnifiedCheckedAt] = useState('');
+  const [unifiedMailboxes, setUnifiedMailboxes] = useState({ total: 0, ok: 0, failed: 0 });
+  const [unifiedFailed, setUnifiedFailed] = useState<UnifiedFailed[]>([]);
+  const [unifiedRange, setUnifiedRange] = useState('last');
+  const [unifiedLoading, setUnifiedLoading] = useState(false);
+  const [unifiedLoaded, setUnifiedLoaded] = useState(false);
+  const [lastCheck, setLastCheck] = useState('');
 
   const [newLabel, setNewLabel] = useState('');
   const [newEmail, setNewEmail] = useState('');
@@ -120,6 +171,88 @@ export default function AdminMailPage() {
     loadMessages();
   }, [loadMessages]);
 
+  // 全部新邮件：按时间范围一次拉所有邮箱的新邮件。
+  // 注意：这里不自动改“上次查看时间”，否则一刷新列表就丢了；
+  // 看完后点“已看完，更新上次查看时间”，下次“自上次查看以来”才从那时开始算。
+  const loadUnified = useCallback(async (range: string, reuseSince?: string) => {
+    setUnifiedLoading(true);
+    setErrorMessage('');
+    try {
+      const saved = (() => {
+        try {
+          return localStorage.getItem(LAST_CHECK_KEY) || '';
+        } catch {
+          return '';
+        }
+      })();
+      setLastCheck(saved);
+      const since = reuseSince || computeSince(range).toISOString();
+      const qs = new URLSearchParams({ since, limitPerMailbox: '20', maxTotal: '100' });
+      const data = await apiFetch<{
+        items: UnifiedItem[];
+        total: number;
+        since: string;
+        checkedAt: string;
+        mailboxesTotal: number;
+        mailboxesOk: number;
+        mailboxesFailed: number;
+        failed: UnifiedFailed[];
+      }>(`/api/mail/recent?${qs.toString()}`);
+      setUnifiedItems(data.items);
+      setUnifiedTotal(data.total);
+      setUnifiedSince(data.since);
+      setUnifiedCheckedAt(data.checkedAt);
+      setUnifiedMailboxes({ total: data.mailboxesTotal, ok: data.mailboxesOk, failed: data.mailboxesFailed });
+      setUnifiedFailed(data.failed || []);
+      setUnifiedLoaded(true);
+      setDetail(null);
+      setDetailMailboxId(null);
+    } catch (err) {
+      setErrorMessage(errText(err));
+    } finally {
+      setUnifiedLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (unifiedMode && !unifiedLoaded) {
+      loadUnified(unifiedRange);
+    }
+  }, [unifiedMode, unifiedLoaded, unifiedRange, loadUnified]);
+
+  const handleUnifiedRange = (range: string) => {
+    setUnifiedRange(range);
+    loadUnified(range);
+  };
+
+  const handleMarkViewed = () => {
+    if (!unifiedCheckedAt) return;
+    try {
+      localStorage.setItem(LAST_CHECK_KEY, unifiedCheckedAt);
+      setLastCheck(unifiedCheckedAt);
+      setSuccessMessage(`已更新上次查看时间（${new Date(unifiedCheckedAt).toLocaleString('zh-CN')}），下次“自上次查看以来”从这时开始算。`);
+    } catch {
+      setErrorMessage('本地存储失败，上次查看时间没有更新');
+    }
+  };
+
+  const openUnifiedMessage = async (item: UnifiedItem) => {
+    setErrorMessage('');
+    try {
+      const data = await apiFetch<MailDetail>(`/api/mail/accounts/${item.mailboxId}/messages/${item.uid}`);
+      setDetail(data);
+      setDetailMailboxId(item.mailboxId);
+      if (!data.seen) {
+        await apiFetch(`/api/mail/accounts/${item.mailboxId}/messages/${item.uid}/read`, { method: 'POST' });
+        setUnifiedItems((prev) =>
+          prev.map((m) => (m.mailboxId === item.mailboxId && m.uid === item.uid ? { ...m, seen: true } : m)),
+        );
+      }
+    } catch (err) {
+      setErrorMessage(errText(err));
+    }
+  };
+
   useEffect(() => {
     setPage(1);
     setDetail(null);
@@ -131,6 +264,7 @@ export default function AdminMailPage() {
     try {
       const data = await apiFetch<MailDetail>(`/api/mail/accounts/${selectedMailboxId}/messages/${uid}`);
       setDetail(data);
+      setDetailMailboxId(selectedMailboxId);
       if (!data.seen) {
         await apiFetch(`/api/mail/accounts/${selectedMailboxId}/messages/${uid}/read`, { method: 'POST' });
         setMessages((prev) => prev.map((m) => (m.uid === uid ? { ...m, seen: true } : m)));
@@ -246,15 +380,24 @@ export default function AdminMailPage() {
     }
   };
 
-  const handleDeleteMessage = async (uid: number) => {
-    if (!selectedMailboxId) return;
+  const handleDeleteMessage = async (uid: number, mailboxId?: string) => {
+    const targetMailboxId = mailboxId || detailMailboxId || selectedMailboxId;
+    if (!targetMailboxId) return;
     if (!window.confirm('确定要删除这封邮件吗？删除后它将从收件箱消失，QQ 邮箱里一般可在已删除里找回，具体以 QQ 邮箱为准。')) return;
     setErrorMessage('');
     setSuccessMessage('');
     try {
-      await apiFetch(`/api/mail/accounts/${selectedMailboxId}/messages/${uid}`, { method: 'DELETE' });
-      if (detail?.uid === uid) setDetail(null);
+      await apiFetch(`/api/mail/accounts/${targetMailboxId}/messages/${uid}`, { method: 'DELETE' });
+      if (detail?.uid === uid) {
+        setDetail(null);
+        setDetailMailboxId(null);
+      }
       setSuccessMessage('已删除该邮件');
+      if (unifiedMode) {
+        setUnifiedItems((prev) => prev.filter((m) => !(m.mailboxId === targetMailboxId && m.uid === uid)));
+        setUnifiedTotal((t) => Math.max(0, t - 1));
+        return;
+      }
       if (messages.length === 1 && page > 1) {
         setPage(page - 1);
       } else {
@@ -291,10 +434,11 @@ export default function AdminMailPage() {
   };
 
   const downloadAttachment = async (uid: number, index: number, filename: string) => {
-    if (!selectedMailboxId) return;
+    const targetMailboxId = detailMailboxId || selectedMailboxId;
+    if (!targetMailboxId) return;
     try {
       const token = localStorage.getItem('xblog_token');
-      const res = await fetch(`/api/mail/accounts/${selectedMailboxId}/messages/${uid}/attachments/${index}`, {
+      const res = await fetch(`/api/mail/accounts/${targetMailboxId}/messages/${uid}/attachments/${index}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('下载附件失败');
@@ -310,12 +454,74 @@ export default function AdminMailPage() {
     }
   };
 
+  const detailMailboxEmail =
+    (detailMailboxId
+      ? groups.flatMap((g) => g.mailboxes).find((m) => m.id === detailMailboxId)?.email
+      : selectedMailbox?.email) || '';
+
+  const detailPane = (
+    <div className="lg:col-span-3 rounded-2xl border border-border bg-card p-6 shadow-sm min-h-[300px]">
+      {!detail ? (
+        <p className="text-sm text-muted-foreground">点左侧一封邮件查看正文。</p>
+      ) : (
+        <article>
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="text-lg font-bold">{detail.subject}</h2>
+            <button
+              onClick={() => handleDeleteMessage(detail.uid)}
+              className="shrink-0 rounded-btn border border-red-200 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+            >
+              删除这封邮件
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground break-words">发件人：{detail.from}</p>
+          <p className="mt-1 text-xs text-muted-foreground break-words">收件人：{detail.to || detailMailboxEmail}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            时间：{detail.date ? new Date(detail.date).toLocaleString('zh-CN') : ''}
+          </p>
+          {detail.attachments.length > 0 && (
+            <div className="mt-4 border-t border-border pt-3">
+              <p className="text-sm font-semibold mb-2">附件（{detail.attachments.length} 个，超过 30MB 请去 QQ 邮箱下载）</p>
+              <ul className="space-y-1">
+                {detail.attachments.map((a) => (
+                  <li key={a.index}>
+                    <button
+                      onClick={() => downloadAttachment(detail.uid, a.index, a.filename)}
+                      className="text-sm text-blue-600 hover:underline break-words"
+                    >
+                      {a.filename}（{(a.size / 1024).toFixed(1)} KB）
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="mt-4 border-t border-border pt-4">
+            {detail.html ? (
+              <iframe
+                title="邮件正文"
+                sandbox=""
+                srcDoc={detail.html}
+                className="w-full border-0"
+                style={{ height: 640 }}
+              />
+            ) : detail.text ? (
+              <pre className="whitespace-pre-wrap break-words text-sm leading-relaxed">{detail.text}</pre>
+            ) : (
+              <p className="text-sm text-muted-foreground">这封邮件没有可显示的正文。</p>
+            )}
+          </div>
+        </article>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-8 max-w-6xl">
       <div>
         <h1 className="text-2xl font-bold text-foreground">邮箱管理</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          左侧“邮箱管理”下方是按分组的邮箱列表：QQ 分组点分组标题查看数字邮箱（数字邮箱就是 QQ 号，不再单列一行），点字母或 Foxmail 行查看对应邮箱；163 分组只有一个邮箱，点分组标题即查看它；点“邮箱管理”可以把列表收起来或展开。
+          左侧“邮箱管理”最上方有“全部新邮件”，一次看所有邮箱在选定时间范围内的新邮件，不用逐个点邮箱；也可以在下方按分组点单个邮箱查看。QQ 分组点分组标题查看数字邮箱（数字邮箱就是 QQ 号，不再单列一行），点字母或 Foxmail 行查看对应邮箱；163 分组只有一个邮箱，点分组标题即查看它；点“邮箱管理”可以把列表收起来或展开。
           一个 QQ 的数字、字母、Foxmail 三个邮箱共用一个总授权码；163 分组只能有 1 个邮箱，用它自己的客户端授权密码，不能和 QQ 邮箱混在一个分组里。邮件可以删除，删除前会二次确认。
           授权码只在添加或更新时提交给后端加密保存，不会在页面上回显。
         </p>
@@ -502,7 +708,109 @@ export default function AdminMailPage() {
         </div>
       )}
 
-      {groups.length === 0 ? (
+      {unifiedMode ? (
+        <div className="grid gap-6 lg:grid-cols-5">
+          <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-base font-semibold">全部新邮件</h2>
+              <button onClick={() => setUnifiedMode(false)} className="text-sm text-muted-foreground hover:underline">
+                返回单个邮箱
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              一次拉所有邮箱在选定时间范围内的新邮件，按时间倒序；每封下面都标了是哪个邮箱收到的。已读/未读以各邮箱自己的状态为准，点开即标记已读。
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {Object.entries(RANGE_LABELS).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => handleUnifiedRange(key)}
+                  disabled={unifiedLoading}
+                  className={`rounded-btn border px-3 py-1.5 text-xs disabled:opacity-50 ${
+                    unifiedRange === key ? 'bg-primary text-primary-foreground border-primary' : 'border-border'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {unifiedLoading
+                ? '正在逐个登录各邮箱拉取，请稍等（邮箱多时约十几秒）…'
+                : unifiedLoaded
+                  ? `范围：${unifiedSince ? new Date(unifiedSince).toLocaleString('zh-CN') : ''} 至今，共 ${unifiedTotal} 封，${unifiedMailboxes.ok}/${unifiedMailboxes.total} 个邮箱拉取成功`
+                  : ''}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              上次查看时间：{lastCheck ? new Date(lastCheck).toLocaleString('zh-CN') : '还没有记录，默认按最近 24 小时'}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={() => loadUnified(unifiedRange, unifiedSince || undefined)}
+                disabled={unifiedLoading}
+                className="rounded-btn border border-border px-3 py-1.5 text-xs disabled:opacity-50"
+              >
+                刷新（同一范围）
+              </button>
+              <button
+                onClick={handleMarkViewed}
+                disabled={!unifiedCheckedAt || unifiedLoading}
+                className="rounded-btn bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                已看完，更新上次查看时间
+              </button>
+            </div>
+            {unifiedFailed.length > 0 && (
+              <div className="mt-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 p-3 border border-amber-200 dark:border-amber-900/60 text-xs text-amber-700 dark:text-amber-300">
+                以下 {unifiedFailed.length} 个邮箱拉取失败（多半是授权码过期），其他邮箱的新邮件不受影响：
+                <ul className="mt-1 space-y-1">
+                  {unifiedFailed.map((f) => (
+                    <li key={f.mailboxId} className="break-words">
+                      {f.groupLabel} · {f.email}：{f.error}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <ul className="mt-3 divide-y divide-border">
+              {unifiedItems.map((m) => (
+                <li key={`${m.mailboxId}-${m.uid}`} className="flex items-start gap-1">
+                  <button
+                    onClick={() => openUnifiedMessage(m)}
+                    className={`flex-1 min-w-0 text-left px-2 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-900 rounded-btn ${
+                      detail?.uid === m.uid && detailMailboxId === m.mailboxId ? 'bg-zinc-100 dark:bg-zinc-900' : ''
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      {!m.seen && <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 shrink-0" />}
+                      <span className={`text-sm truncate ${m.seen ? 'font-normal' : 'font-semibold'}`}>{m.subject}</span>
+                    </span>
+                    <span className="block text-xs text-muted-foreground truncate mt-1">{m.from}</span>
+                    <span className="block text-xs text-muted-foreground truncate mt-0.5">
+                      {m.groupLabel} · {m.mailboxEmail}（{mailboxTypeLabel(m.mailboxType)}）
+                    </span>
+                    <span className="block text-xs text-muted-foreground mt-0.5">
+                      {m.date ? new Date(m.date).toLocaleString('zh-CN') : ''}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteMessage(m.uid, m.mailboxId)}
+                    title="删除这封邮件"
+                    className="mt-3 shrink-0 rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                  >
+                    删除
+                  </button>
+                </li>
+              ))}
+              {unifiedItems.length === 0 && unifiedLoaded && !unifiedLoading && (
+                <li className="px-2 py-6 text-sm text-muted-foreground">这个时间范围内没有新邮件，可以换一个更长的时间范围试试。</li>
+              )}
+            </ul>
+          </div>
+          {detailPane}
+        </div>
+      ) : groups.length === 0 ? (
+
         <div className="rounded-2xl border border-border bg-card p-8 text-sm text-muted-foreground">
           还没有添加任何邮箱分组，请先在上面添加一个分组。
         </div>
@@ -590,60 +898,7 @@ export default function AdminMailPage() {
             </div>
           </div>
 
-          <div className="lg:col-span-3 rounded-2xl border border-border bg-card p-6 shadow-sm min-h-[300px]">
-            {!detail ? (
-              <p className="text-sm text-muted-foreground">点左侧一封邮件查看正文。</p>
-            ) : (
-              <article>
-                <div className="flex items-start justify-between gap-3">
-                  <h2 className="text-lg font-bold">{detail.subject}</h2>
-                  <button
-                    onClick={() => handleDeleteMessage(detail.uid)}
-                    className="shrink-0 rounded-btn border border-red-200 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
-                  >
-                    删除这封邮件
-                  </button>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground break-words">发件人：{detail.from}</p>
-                <p className="mt-1 text-xs text-muted-foreground break-words">收件人：{detail.to || selectedMailbox.email}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  时间：{detail.date ? new Date(detail.date).toLocaleString('zh-CN') : ''}
-                </p>
-                {detail.attachments.length > 0 && (
-                  <div className="mt-4 border-t border-border pt-3">
-                    <p className="text-sm font-semibold mb-2">附件（{detail.attachments.length} 个，超过 30MB 请去 QQ 邮箱下载）</p>
-                    <ul className="space-y-1">
-                      {detail.attachments.map((a) => (
-                        <li key={a.index}>
-                          <button
-                            onClick={() => downloadAttachment(detail.uid, a.index, a.filename)}
-                            className="text-sm text-blue-600 hover:underline break-words"
-                          >
-                            {a.filename}（{(a.size / 1024).toFixed(1)} KB）
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                <div className="mt-4 border-t border-border pt-4">
-                  {detail.html ? (
-                    <iframe
-                      title="邮件正文"
-                      sandbox=""
-                      srcDoc={detail.html}
-                      className="w-full border-0"
-                      style={{ height: 640 }}
-                    />
-                  ) : detail.text ? (
-                    <pre className="whitespace-pre-wrap break-words text-sm leading-relaxed">{detail.text}</pre>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">这封邮件没有可显示的正文。</p>
-                  )}
-                </div>
-              </article>
-            )}
-          </div>
+          {detailPane}
         </div>
       )}
     </div>

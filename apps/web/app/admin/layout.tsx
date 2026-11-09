@@ -32,6 +32,8 @@ function AdminLayoutInner({
     mailListExpanded,
     setMailListExpanded,
     setEditGroupId,
+    unifiedMode,
+    setUnifiedMode,
   } = useMailContext();
 
   const handleMailNavClick = () => {
@@ -151,6 +153,25 @@ function AdminLayoutInner({
                     </button>
                     {mailListExpanded && (
                       <div className="mt-1 ml-2 space-y-3 pr-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUnifiedMode(true);
+                            if (!pathname.startsWith('/admin/mail')) {
+                              router.push('/admin/mail');
+                            }
+                          }}
+                          className={`w-full text-left rounded-btn px-2 py-2 text-xs font-semibold ${
+                            unifiedMode
+                              ? 'bg-zinc-700 text-white'
+                              : 'bg-zinc-900/60 text-white hover:bg-zinc-800'
+                          }`}
+                        >
+                          全部新邮件
+                          <span className="block mt-0.5 text-[11px] font-normal text-zinc-400">
+                            一次看所有邮箱的新邮件，不用逐个点
+                          </span>
+                        </button>
                         {groups.map((g) => {
                           // 数字邮箱就是 QQ 号本身（分组标题已是 QQ 号），左侧不再单列一行省空间；
                           // 点分组标题即查看数字邮箱（没有数字邮箱的组则查看该组第一个邮箱）

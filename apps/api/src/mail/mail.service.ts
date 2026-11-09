@@ -298,6 +298,108 @@ export class MailService {
     };
   }
 
+  async listRecent(sinceRaw?: string, limitPerMailboxRaw?: number, maxTotalRaw?: number) {
+    const now = new Date();
+    let since = sinceRaw ? new Date(sinceRaw) : new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    if (Number.isNaN(since.getTime())) {
+      since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    }
+    // 防滥用：最多回溯 30 天，不接受未来时间
+    const oldest = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    if (since < oldest) since = oldest;
+    if (since > now) since = now;
+    const limitPerMailbox = Math.min(50, Math.max(1, limitPerMailboxRaw || 20));
+    const maxTotal = Math.min(200, Math.max(20, maxTotalRaw || 100));
+
+    const groups = await this.prisma.qqGroup.findMany({
+      orderBy: { createdAt: 'asc' },
+      include: { mailAccounts: { orderBy: { createdAt: 'asc' } } },
+    });
+    type UnifiedItem = {
+      mailboxId: string;
+      mailboxEmail: string;
+      mailboxType: string;
+      groupId: string;
+      groupLabel: string;
+      uid: number;
+      from: string;
+      subject: string;
+      date: string | null;
+      seen: boolean;
+    };
+    const items: UnifiedItem[] = [];
+    const failed: { mailboxId: string; email: string; groupLabel: string; error: string }[] = [];
+    let mailboxesTotal = 0;
+
+    // 每个邮箱都要单独登一次 IMAP（用户名不同，不能复用连接），
+    // 11 个分组约 30 个邮箱：4 路并发，既不把 QQ/163 登录打爆，也不用等一分多钟
+    const jobs: { account: any; group: any; authCode: string }[] = [];
+    for (const group of groups) {
+      let authCode: string;
+      try {
+        authCode = this.crypto.decrypt(group.encryptedAuthCode);
+      } catch {
+        for (const m of group.mailAccounts) {
+          mailboxesTotal += 1;
+          failed.push({ mailboxId: m.id, email: m.email, groupLabel: group.label, error: '该组授权码无法解密，请重新更新授权码' });
+        }
+        continue;
+      }
+      for (const m of group.mailAccounts) {
+        mailboxesTotal += 1;
+        jobs.push({ account: m, group, authCode });
+      }
+    }
+    const CONCURRENCY = 4;
+    for (let i = 0; i < jobs.length; i += CONCURRENCY) {
+      const chunk = jobs.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(
+        chunk.map(async ({ account, group, authCode }) => {
+          const list = await this.imap.listRecent(
+            { imapHost: account.imapHost, imapPort: account.imapPort, username: account.username, authCode },
+            since,
+            limitPerMailbox,
+          );
+          return { account, group, list };
+        }),
+      );
+      results.forEach((r, idx) => {
+        const { account, group } = chunk[idx];
+        if (r.status === 'fulfilled') {
+          for (const m of r.value.list) {
+            items.push({
+              mailboxId: account.id,
+              mailboxEmail: account.email,
+              mailboxType: account.mailboxType,
+              groupId: group.id,
+              groupLabel: group.label,
+              uid: m.uid,
+              from: m.from,
+              subject: m.subject,
+              date: m.date,
+              seen: m.seen,
+            });
+          }
+        } else {
+          // 单个邮箱失败（最常见是授权码过期）只记进 failed，不让整个聚合失败
+          const msg = (r.reason as Error)?.message || '无法连接邮箱，请稍后重试';
+          failed.push({ mailboxId: account.id, email: account.email, groupLabel: group.label, error: msg.slice(0, 120) });
+        }
+      });
+    }
+    items.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+    return {
+      items: items.slice(0, maxTotal),
+      total: items.length,
+      since: since.toISOString(),
+      checkedAt: now.toISOString(),
+      mailboxesTotal,
+      mailboxesOk: mailboxesTotal - failed.length,
+      mailboxesFailed: failed.length,
+      failed,
+    };
+  }
+
   async listMessages(id: string, page: number, pageSize: number, q?: string) {
     const { creds } = await this.credsFor(id);
     return this.imap.listMessages(creds, page, pageSize, q);

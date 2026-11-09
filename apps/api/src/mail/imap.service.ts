@@ -77,6 +77,40 @@ export class ImapService {
     return new BadGatewayException('无法连接 QQ 邮箱，请稍后重试');
   }
 
+  async listRecent(
+    creds: MailAccountCredentials,
+    since: Date,
+    maxPerMailbox: number,
+  ): Promise<MailListItem[]> {
+    return this.withClient(creds, async (client) => {
+      const mailbox = await client.mailboxOpen('INBOX');
+      const totalExists = mailbox?.exists || 0;
+      if (totalExists === 0) return [];
+      // IMAP SINCE 只精确到日期（当天 00:00 起），先按日期粗筛，再在下面按精确时间过滤
+      let uids: number[] | null = null;
+      try {
+        const found = await client.search({ since }, { uid: true });
+        uids = Array.isArray(found) ? [...found].sort((a, b) => b - a) : null;
+      } catch {
+        uids = null; // 搜索语法不兼容时回落到取最近一批再按时间过滤
+      }
+      let items: MailListItem[];
+      if (uids) {
+        const slice = uids.slice(0, maxPerMailbox * 2);
+        items = slice.length > 0 ? await this.fetchByUids(client, slice) : [];
+      } else {
+        const end = totalExists;
+        const start = Math.max(1, end - 99);
+        items = await this.fetchRange(client, start, end);
+      }
+      const sinceMs = since.getTime();
+      return items
+        .filter((m) => (m.date ? new Date(m.date).getTime() >= sinceMs : false))
+        .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
+        .slice(0, maxPerMailbox);
+    });
+  }
+
   async testConnection(creds: MailAccountCredentials): Promise<void> {
     await this.withClient(creds, async (client) => {
       await client.mailboxOpen('INBOX');

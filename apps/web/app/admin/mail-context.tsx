@@ -38,6 +38,8 @@ type MailContextValue = {
   setMailListExpanded: (v: boolean) => void;
   editGroupId: string;
   setEditGroupId: (id: string) => void;
+  unifiedMode: boolean;
+  setUnifiedMode: (v: boolean) => void;
 };
 
 const MailContext = createContext<MailContextValue | null>(null);
@@ -54,10 +56,12 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
   const [selectedMailboxId, setSelectedMailboxIdState] = useState('');
   const [mailListExpanded, setMailListExpandedState] = useState(true);
   const [editGroupId, setEditGroupId] = useState('');
+  const [unifiedMode, setUnifiedMode] = useState(false);
   const loadedRef = useRef(false);
 
   const setSelectedMailboxId = useCallback((id: string) => {
     setSelectedMailboxIdState(id);
+    setUnifiedMode(false);
     try {
       if (id) localStorage.setItem('xblog_selected_mailbox', id);
       else localStorage.removeItem('xblog_selected_mailbox');
@@ -143,8 +147,10 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
       setMailListExpanded,
       editGroupId,
       setEditGroupId,
+      unifiedMode,
+      setUnifiedMode,
     };
-  }, [groups, selectedMailboxId, setSelectedMailboxId, refreshGroups, mailListExpanded, setMailListExpanded, editGroupId]);
+  }, [groups, selectedMailboxId, setSelectedMailboxId, refreshGroups, mailListExpanded, setMailListExpanded, editGroupId, unifiedMode]);
 
   return <MailContext.Provider value={value}>{children}</MailContext.Provider>;
 }

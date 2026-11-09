@@ -58,6 +58,19 @@ export class MailController {
     return this.mailService.deleteMailbox(id);
   }
 
+  @Get('recent')
+  listRecent(
+    @Query('since') since?: string,
+    @Query('limitPerMailbox') limitPerMailboxRaw?: string,
+    @Query('maxTotal') maxTotalRaw?: string,
+  ) {
+    return this.mailService.listRecent(
+      since,
+      limitPerMailboxRaw ? parseInt(limitPerMailboxRaw, 10) : undefined,
+      maxTotalRaw ? parseInt(maxTotalRaw, 10) : undefined,
+    );
+  }
+
   @Get('accounts')
   listAccounts() {
     return this.mailService.listAccounts();
