@@ -99,7 +99,31 @@ export default function AdminDashboardPage() {
         <h2 className="font-serif text-base font-bold text-foreground mb-4">
           快捷操作
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Link
+            href="/admin/perks"
+            className="flex flex-col p-4 rounded-btn border border-border hover:border-foreground/30 hover:bg-muted/40 transition group"
+          >
+            <span className="font-semibold text-foreground group-hover:text-accent transition-colors flex items-center justify-between">
+              <span>优惠雷达</span>
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </span>
+            <span className="text-xs text-muted-foreground mt-1">
+              查看每日限免、优惠线索与收藏/已领状态
+            </span>
+          </Link>
+          <Link
+            href="/admin/mail"
+            className="flex flex-col p-4 rounded-btn border border-border hover:border-foreground/30 hover:bg-muted/40 transition group"
+          >
+            <span className="font-semibold text-foreground group-hover:text-accent transition-colors flex items-center justify-between">
+              <span>邮箱管理</span>
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </span>
+            <span className="text-xs text-muted-foreground mt-1">
+              统一查看多账号 QQ / 163 收件箱新邮件
+            </span>
+          </Link>
           <Link
             href="/admin/posts/new"
             className="flex flex-col p-4 rounded-btn border border-border hover:border-foreground/30 hover:bg-muted/40 transition group"

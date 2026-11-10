@@ -1,15 +1,30 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Search, Menu, X, ArrowUpRight } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Search, Menu, X, ArrowUpRight, Radar } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const pathname = usePathname();
   const router = useRouter();
+
+  useEffect(() => {
+    const syncAuth = () => {
+      try {
+        setIsAdmin(Boolean(localStorage.getItem('xblog_token')));
+      } catch {
+        setIsAdmin(false);
+      }
+    };
+    syncAuth();
+    window.addEventListener('storage', syncAuth);
+    return () => window.removeEventListener('storage', syncAuth);
+  }, [pathname]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,6 +33,13 @@ export default function Header() {
       setMobileMenuOpen(false);
     }
   };
+
+  const navLinkClass = (active: boolean) =>
+    `text-sm font-medium transition-colors duration-200 rounded-btn px-3 py-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
+      active
+        ? 'bg-muted text-foreground font-semibold'
+        : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+    }`;
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border bg-background/85 backdrop-blur-md transition-colors duration-200">
@@ -42,22 +64,31 @@ export default function Header() {
           <nav className="hidden md:flex items-center gap-1 sm:gap-2">
             <Link
               href="/"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors duration-200 rounded-btn px-3 py-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              className={navLinkClass(pathname === '/')}
             >
               首页
             </Link>
             <Link
               href="/categories"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors duration-200 rounded-btn px-3 py-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              className={navLinkClass(pathname.startsWith('/categories'))}
             >
               分类
             </Link>
             <Link
               href="/about"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors duration-200 rounded-btn px-3 py-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              className={navLinkClass(pathname === '/about')}
             >
               关于
             </Link>
+            {isAdmin && (
+              <Link
+                href="/admin/perks"
+                className={`inline-flex items-center gap-1.5 ${navLinkClass(pathname.startsWith('/admin/perks'))}`}
+              >
+                <Radar className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
+                <span>优惠雷达</span>
+              </Link>
+            )}
           </nav>
         </div>
 
@@ -167,6 +198,16 @@ export default function Header() {
           >
             关于
           </Link>
+          {isAdmin && (
+            <Link
+              href="/admin/perks"
+              onClick={() => setMobileMenuOpen(false)}
+              className="min-h-[44px] flex items-center gap-2 px-4 rounded-btn text-base font-medium text-foreground hover:bg-muted hover:text-accent transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Radar className="h-4 w-4 text-accent" aria-hidden="true" />
+              <span>优惠雷达</span>
+            </Link>
+          )}
           <Link
             href="/admin"
             onClick={() => setMobileMenuOpen(false)}
