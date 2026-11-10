@@ -98,3 +98,71 @@ model MailAccount {
 
   @@index([qqGroupId])
 }
+
+// 后台优惠雷达（Perks Radar）：只存轻量线索索引（标题、规范化链接、短摘要、时间与状态），
+// 不抓原文正文，不暴露前台，仅限管理员后台使用。
+model PerkRound {
+  id         String          @id @default(uuid())
+  trigger    String
+  status     String
+  startedAt  DateTime        @default(now())
+  finishedAt DateTime?
+  sourceRuns PerkSourceRun[]
+  items      PerkItem[]
+
+  @@index([startedAt])
+  @@index([trigger, startedAt])
+}
+
+model PerkSourceRun {
+  id            String    @id @default(uuid())
+  roundId       String
+  round         PerkRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  sourceId      String
+  ok            Boolean
+  notModified   Boolean   @default(false)
+  fetchedCount  Int       @default(0)
+  insertedCount Int       @default(0)
+  error         String?
+  finalUrl      String?
+  startedAt     DateTime  @default(now())
+  finishedAt    DateTime?
+
+  @@index([roundId])
+  @@index([sourceId, startedAt])
+}
+
+model PerkSourceState {
+  sourceId            String    @id
+  etag                String?
+  lastModified        String?
+  lastFetchedAt       DateTime?
+  lastOkAt            DateTime?
+  lastError           String?
+  consecutiveFailures Int       @default(0)
+  updatedAt           DateTime  @updatedAt
+}
+
+model PerkItem {
+  id               String     @id @default(uuid())
+  canonicalUrl     String     @unique
+  url              String
+  title            String
+  summary          String     @default("")
+  category         String
+  sourceId         String
+  publishedAt      DateTime?
+  expiresAt        DateTime?
+  firstSeenAt      DateTime   @default(now())
+  firstSeenRoundId String?
+  firstSeenRound   PerkRound? @relation(fields: [firstSeenRoundId], references: [id], onDelete: SetNull)
+  isBookmarked     Boolean    @default(false)
+  isClaimed        Boolean    @default(false)
+  updatedAt        DateTime   @updatedAt
+
+  @@index([sourceId, category])
+  @@index([publishedAt])
+  @@index([firstSeenAt])
+  @@index([isBookmarked])
+}
+
