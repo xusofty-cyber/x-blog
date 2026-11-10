@@ -1,6 +1,43 @@
-node_modules
+﻿node_modules
 .next
 dist
 .env
 *.log
 .DS_Store
+
+# ==============================================================================
+# Agent Harness local runtime & machine-specific ignores
+# ==============================================================================
+# Claude & Comet local runtime generated artifacts
+.claude/skills/
+.comet/*
+!.comet/config.yaml
+
+# Machine-specific agent hook configurations (comet init / local IDE hooks with absolute paths)
+.codex/hooks.json
+.trae/hooks.json
+.trae-cn/hooks.json
+.devin/hooks.json
+.github/hooks/
+.kiro/hooks/
+
+# Backup files generated during deployment
+*.bak-*
+
+# Local ai-memory project opt-in; never commit a machine/project marker by default
+/.ai-memory.toml
+
+# Temporary logs & scratch
+scratch/
+
+# Cost ledger telemetry (Phase 2, 2-3/2-5): one line per tool call, high-churn
+# local telemetry — never committed (unlike gate/feature_list.json +
+# events.jsonl, which are reviewable evidence).
+gate/cost-ledger.jsonl
+.claude/skill-usage.jsonl
+.claude/hooks/guard-alerts.jsonl
+gate/*-stop-state.json
+gate/termination.json
+loop-state.json
+loop-events.jsonl
+graph-state.jsonl
