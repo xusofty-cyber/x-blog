@@ -7,6 +7,7 @@ import { UpdateMailAccountDto } from './dto/update-mail-account.dto';
 import { AddMailboxDto, CreateQqGroupDto } from './dto/create-qq-group.dto';
 import { UpdateMailboxDto, UpdateQqGroupDto } from './dto/update-qq-group.dto';
 import { dedupeUnifiedItems, UnifiedItem } from './unified-dedupe';
+import { groupBatchDeleteItems, normalizeBatchDeleteItems } from './batch-delete';
 
 function publicAccount(a: any) {
   return a;
@@ -413,6 +414,48 @@ export class MailService {
     const { creds } = await this.credsFor(id);
     await this.imap.deleteMessage(creds, uid);
     return { ok: true };
+  }
+
+  /**
+   * 批量删除：按邮箱分组，每邮箱一次 IMAP 连接逐封删。
+   * 单个邮箱整体失败（例如授权码过期）或单封失败，都只记进 failed，不让整个批量失败；
+   * 同一 QQ 三个别名去重后只剩一份代表份，删它即删共享收件箱里的那封，不会残留副本。
+   */
+  async batchDelete(rawItems: unknown) {
+    const items = normalizeBatchDeleteItems(rawItems);
+    const groups = groupBatchDeleteItems(items);
+    const deleted: { mailboxId: string; email: string; uid: number }[] = [];
+    const failed: { mailboxId: string; email: string; uid: number; error: string }[] = [];
+    for (const { mailboxId, uids } of groups) {
+      let account: any;
+      let creds: any;
+      try {
+        ({ account, creds } = await this.credsFor(mailboxId));
+      } catch (err) {
+        const msg = (err as Error)?.message || '未找到该邮箱';
+        for (const uid of uids) failed.push({ mailboxId, email: '', uid, error: msg.slice(0, 120) });
+        continue;
+      }
+      let results: { uid: number; ok: boolean; error?: string }[];
+      try {
+        results = await this.imap.deleteMessages(creds, uids);
+      } catch (err) {
+        const msg = (err as Error)?.message || '无法连接邮箱，请稍后重试';
+        for (const uid of uids) failed.push({ mailboxId, email: account.email, uid, error: msg.slice(0, 120) });
+        continue;
+      }
+      for (const r of results) {
+        if (r.ok) deleted.push({ mailboxId, email: account.email, uid: r.uid });
+        else failed.push({ mailboxId, email: account.email, uid: r.uid, error: (r.error || '删除失败').slice(0, 120) });
+      }
+    }
+    return {
+      total: groups.reduce((n, g) => n + g.uids.length, 0),
+      deletedCount: deleted.length,
+      failedCount: failed.length,
+      deleted,
+      failed,
+    };
   }
 
   async getAttachment(id: string, uid: number, index: number) {

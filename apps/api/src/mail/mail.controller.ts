@@ -118,6 +118,11 @@ export class MailController {
     return this.mailService.deleteMessage(id, parseInt(uidRaw, 10));
   }
 
+  @Post('batch-delete')
+  batchDelete(@Body() body: { items?: unknown }) {
+    return this.mailService.batchDelete(body?.items);
+  }
+
   @Get('accounts/:id/messages/:uid/attachments/:index')
   async getAttachment(
     @Param('id') id: string,

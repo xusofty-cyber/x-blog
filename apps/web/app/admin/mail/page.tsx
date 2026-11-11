@@ -113,6 +113,11 @@ export default function AdminMailPage() {
   const [unifiedLoaded, setUnifiedLoaded] = useState(false);
   const [lastCheck, setLastCheck] = useState('');
 
+  // 批量删除选中状态：统一视图用 "mailboxId:uid"，单个邮箱视图用 uid
+  const [unifiedSelected, setUnifiedSelected] = useState<Set<string>>(new Set());
+  const [singleSelected, setSingleSelected] = useState<Set<number>>(new Set());
+  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+
   const [newLabel, setNewLabel] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newType, setNewType] = useState('numeric');
@@ -208,6 +213,7 @@ export default function AdminMailPage() {
       setUnifiedMailboxes({ total: data.mailboxesTotal, ok: data.mailboxesOk, failed: data.mailboxesFailed });
       setUnifiedFailed(data.failed || []);
       setUnifiedLoaded(true);
+      setUnifiedSelected(new Set());
       setDetail(null);
       setDetailMailboxId(null);
     } catch (err) {
@@ -259,6 +265,7 @@ export default function AdminMailPage() {
   useEffect(() => {
     setPage(1);
     setDetail(null);
+    setSingleSelected(new Set());
   }, [selectedMailboxId]);
 
   const openMessage = async (uid: number) => {
@@ -381,6 +388,85 @@ export default function AdminMailPage() {
     } finally {
       setIsEditing(false);
     }
+  };
+
+  const handleBatchDelete = async (items: { mailboxId: string; uid: number }[]) => {
+    if (items.length === 0 || isBatchDeleting) return;
+    if (
+      !window.confirm(
+        `确定要删除选中的 ${items.length} 封邮件吗？删除后它们将从收件箱消失，QQ 邮箱里一般可在已删除里找回，具体以 QQ 邮箱为准。`,
+      )
+    )
+      return;
+    setErrorMessage('');
+    setSuccessMessage('');
+    setIsBatchDeleting(true);
+    try {
+      const data = await apiFetch<{
+        total: number;
+        deletedCount: number;
+        failedCount: number;
+        deleted: { mailboxId: string; email: string; uid: number }[];
+        failed: { mailboxId: string; email: string; uid: number; error: string }[];
+      }>('/api/mail/batch-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+      });
+      const deletedKeys = new Set(data.deleted.map((d) => `${d.mailboxId}:${d.uid}`));
+      if (unifiedMode) {
+        setUnifiedItems((prev) => prev.filter((m) => !deletedKeys.has(`${m.mailboxId}:${m.uid}`)));
+        setUnifiedTotal((n) => Math.max(0, n - data.deletedCount));
+        setUnifiedSelected((prev) => {
+          const next = new Set(prev);
+          for (const k of deletedKeys) next.delete(k);
+          return next;
+        });
+      } else {
+        const deletedUids = new Set(data.deleted.map((d) => d.uid));
+        setMessages((prev) => prev.filter((m) => !deletedUids.has(m.uid)));
+        setTotal((n) => Math.max(0, n - data.deletedCount));
+        if (messages.length > 0 && messages.length <= data.deletedCount && page > 1) setPage(page - 1);
+        setSingleSelected((prev) => {
+          const next = new Set(prev);
+          for (const u of deletedUids) next.delete(u);
+          return next;
+        });
+      }
+      if (detail && deletedKeys.has(`${detailMailboxId}:${detail.uid}`)) {
+        setDetail(null);
+        setDetailMailboxId(null);
+      }
+      if (data.failedCount > 0) {
+        setErrorMessage(
+          `已删除 ${data.deletedCount} 封，${data.failedCount} 封删除失败：` +
+            data.failed
+              .slice(0, 3)
+              .map((f) => `${f.email || f.mailboxId}（${f.error}）`)
+              .join('；'),
+        );
+        setSuccessMessage('');
+      } else {
+        setSuccessMessage(`已删除 ${data.deletedCount} 封邮件`);
+      }
+    } catch (err) {
+      setErrorMessage(errText(err));
+    } finally {
+      setIsBatchDeleting(false);
+    }
+  };
+
+  const handleBatchDeleteUnified = () => {
+    const items = [...unifiedSelected].map((key) => {
+      const idx = key.lastIndexOf(':');
+      return { mailboxId: key.slice(0, idx), uid: parseInt(key.slice(idx + 1), 10) };
+    });
+    handleBatchDelete(items);
+  };
+
+  const handleBatchDeleteSingle = () => {
+    if (!selectedMailboxId) return;
+    handleBatchDelete([...singleSelected].map((uid) => ({ mailboxId: selectedMailboxId, uid })));
   };
 
   const handleDeleteMessage = async (uid: number, mailboxId?: string) => {
@@ -526,7 +612,7 @@ export default function AdminMailPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           左侧“邮箱管理”最上方有“全部新邮件”，一次看所有邮箱在选定时间范围内的新邮件，不用逐个点邮箱；也可以在下方按分组点单个邮箱查看。QQ 分组点分组标题查看数字邮箱（数字邮箱就是 QQ 号，不再单列一行），点字母或 Foxmail 行查看对应邮箱；163 分组只有一个邮箱，点分组标题即查看它；点“邮箱管理”可以把列表收起来或展开。
           一个 QQ 的数字、字母、Foxmail 三个邮箱共用一个总授权码；163 分组只能有 1 个邮箱，用它自己的客户端授权密码，不能和 QQ 邮箱混在一个分组里。邮件可以删除，删除前会二次确认。
-          授权码只在添加或更新时提交给后端加密保存，不会在页面上回显。
+          授权码只在添加或更新时提交给后端加密保存，不会在页面上回显。列表里每封前面都有复选框，勾选后点“删除选中”可以一次删多封（全部新邮件和单个邮箱都可以，删之前会二次确认，一次最多 100 封）。
         </p>
       </div>
 
@@ -775,9 +861,45 @@ export default function AdminMailPage() {
                 </ul>
               </div>
             )}
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={unifiedItems.length > 0 && unifiedItems.every((m) => unifiedSelected.has(`${m.mailboxId}:${m.uid}`))}
+                  onChange={(e) => {
+                    if (e.target.checked) setUnifiedSelected(new Set(unifiedItems.map((m) => `${m.mailboxId}:${m.uid}`)));
+                    else setUnifiedSelected(new Set());
+                  }}
+                />
+                全选本页
+              </label>
+              <span className="text-xs text-muted-foreground">已选 {unifiedSelected.size} 封</span>
+              <button
+                onClick={handleBatchDeleteUnified}
+                disabled={unifiedSelected.size === 0 || isBatchDeleting}
+                className="rounded-btn border border-red-200 px-3 py-1.5 text-xs text-red-500 disabled:opacity-50"
+              >
+                {isBatchDeleting ? '删除中…' : `删除选中（${unifiedSelected.size}）`}
+              </button>
+            </div>
             <ul className="mt-3 divide-y divide-border">
               {unifiedItems.map((m) => (
                 <li key={`${m.mailboxId}-${m.uid}`} className="flex items-start gap-1">
+                  <input
+                    type="checkbox"
+                    aria-label="选中这封邮件"
+                    checked={unifiedSelected.has(`${m.mailboxId}:${m.uid}`)}
+                    onChange={(e) => {
+                      const key = `${m.mailboxId}:${m.uid}`;
+                      setUnifiedSelected((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(key);
+                        else next.delete(key);
+                        return next;
+                      });
+                    }}
+                    className="mt-4 shrink-0"
+                  />
                   <button
                     onClick={() => openUnifiedMessage(m)}
                     className={`flex-1 min-w-0 text-left px-2 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-900 rounded-btn ${
@@ -849,9 +971,44 @@ export default function AdminMailPage() {
             <p className="mt-2 text-xs text-muted-foreground">
               {isMsgLoading ? '加载邮件中...' : `共 ${total} 封，第 ${page} / ${totalPages || 1} 页`}
             </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={messages.length > 0 && messages.every((m) => singleSelected.has(m.uid))}
+                  onChange={(e) => {
+                    if (e.target.checked) setSingleSelected(new Set(messages.map((m) => m.uid)));
+                    else setSingleSelected(new Set());
+                  }}
+                />
+                全选本页
+              </label>
+              <span className="text-xs text-muted-foreground">已选 {singleSelected.size} 封</span>
+              <button
+                onClick={handleBatchDeleteSingle}
+                disabled={singleSelected.size === 0 || isBatchDeleting}
+                className="rounded-btn border border-red-200 px-3 py-1.5 text-xs text-red-500 disabled:opacity-50"
+              >
+                {isBatchDeleting ? '删除中…' : `删除选中（${singleSelected.size}）`}
+              </button>
+            </div>
             <ul className="mt-3 divide-y divide-border">
               {messages.map((m) => (
                 <li key={m.uid} className="flex items-start gap-1">
+                  <input
+                    type="checkbox"
+                    aria-label="选中这封邮件"
+                    checked={singleSelected.has(m.uid)}
+                    onChange={(e) => {
+                      setSingleSelected((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(m.uid);
+                        else next.delete(m.uid);
+                        return next;
+                      });
+                    }}
+                    className="mt-4 shrink-0"
+                  />
                   <button
                     onClick={() => openMessage(m.uid)}
                     className={`flex-1 min-w-0 text-left px-2 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-900 rounded-btn ${

@@ -265,6 +265,34 @@ export class ImapService {
     });
   }
 
+  /**
+   * 批量删除：一次 IMAP 连接内逐封删，逐封记结果。
+   * 一封失败（例如已被删、UID 不存在）不中断其余的，结果里逐封说明。
+   */
+  async deleteMessages(
+    creds: MailAccountCredentials,
+    uids: number[],
+  ): Promise<{ uid: number; ok: boolean; error?: string }[]> {
+    return this.withClient(creds, async (client) => {
+      await client.mailboxOpen('INBOX');
+      const results: { uid: number; ok: boolean; error?: string }[] = [];
+      for (const uid of uids) {
+        try {
+          await client.messageFlagsAdd(uid, ['\\Deleted'], { uid: true });
+          const ok = await client.messageDelete(uid, { uid: true });
+          if (ok === false) {
+            results.push({ uid, ok: false, error: '未找到该邮件，可能已被删除' });
+          } else {
+            results.push({ uid, ok: true });
+          }
+        } catch (err) {
+          results.push({ uid, ok: false, error: (err as Error)?.message?.slice(0, 120) || '删除失败' });
+        }
+      }
+      return results;
+    });
+  }
+
   async getAttachment(
     creds: MailAccountCredentials,
     uid: number,
