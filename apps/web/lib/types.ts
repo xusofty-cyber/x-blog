@@ -70,3 +70,56 @@ export interface AdminStats {
   totalTags: number;
   totalUsers: number;
 }
+
+export interface PerkSourceStatus {
+  id: string;
+  name: string;
+  tier: 'fast' | 'slow';
+  intervalMs: number;
+  lastFetchedAt: string | null;
+  lastOkAt: string | null;
+  lastError: string | null;
+  consecutiveFailures: number;
+  nextDueAt: string;
+}
+
+export interface PerkItem {
+  id: string;
+  canonicalUrl: string;
+  url: string;
+  title: string;
+  summary: string;
+  category: string;
+  sourceId: string;
+  sourceName: string;
+  publishedAt: string | null;
+  expiresAt: string | null;
+  firstSeenAt: string;
+  firstSeenRoundId: string | null;
+  isBookmarked: boolean;
+  isClaimed: boolean;
+  isNew: boolean;
+  isExpired: boolean;
+  updatedAt: string;
+}
+
+export interface PerksListResponse {
+  items: PerkItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  newCount: number;
+  bookmarkedCount: number;
+  refreshInFlight: boolean;
+  freshness: 'fresh' | 'stale' | 'severe' | 'unknown';
+  latestRound: {
+    id: string;
+    trigger: string;
+    status: string;
+    startedAt: string;
+    finishedAt: string | null;
+  } | null;
+  sources: PerkSourceStatus[];
+  categories: string[];
+}
