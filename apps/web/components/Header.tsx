@@ -80,6 +80,12 @@ export default function Header() {
             >
               关于
             </Link>
+            <Link
+              href="/nav"
+              className={navLinkClass(pathname === '/nav')}
+            >
+              导航
+            </Link>
             {isAdmin && (
               <Link
                 href="/admin/perks"
@@ -197,6 +203,13 @@ export default function Header() {
             className="min-h-[44px] flex items-center px-4 rounded-btn text-base font-medium text-foreground hover:bg-muted hover:text-accent transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring"
           >
             关于
+          </Link>
+          <Link
+            href="/nav"
+            onClick={() => setMobileMenuOpen(false)}
+            className="min-h-[44px] flex items-center px-4 rounded-btn text-base font-medium text-foreground hover:bg-muted hover:text-accent transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            导航
           </Link>
           {isAdmin && (
             <Link

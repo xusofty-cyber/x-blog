@@ -9,6 +9,7 @@ import { UploadsModule } from './uploads/uploads.module';
 import { SettingsModule } from './settings/settings.module';
 import { MailModule } from './mail/mail.module';
 import { PerksModule } from './perks/perks.module';
+import { NavModule } from './nav/nav.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PerksModule } from './perks/perks.module';
     SettingsModule,
     MailModule,
     PerksModule,
+    NavModule,
   ],
 })
 export class AppModule {}

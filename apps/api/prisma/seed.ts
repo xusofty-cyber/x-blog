@@ -57,6 +57,34 @@ async function main() {
     },
   });
   console.log('Tag upserted: NestJS (nestjs)');
+
+  // 网址导航默认数据（v1，2026-11-17）：一个分类“教育优惠” + 云中君给的
+  // EduMails 学生优惠导航链接。upsert 是幂等的：部署重跑不会重复建；
+  // update 为空对象，所以用户在后台改过标题/简介/顺序后，下次部署也不会
+  // 被 seed 覆盖（改动只在首次创建时生效）。
+  const navCategory = await prisma.navCategory.upsert({
+    where: { name: '教育优惠' },
+    update: {},
+    create: {
+      name: '教育优惠',
+      sortOrder: 0,
+    },
+  });
+  await prisma.navLink.upsert({
+    where: {
+      categoryId_url: { categoryId: navCategory.id, url: 'https://nav.edumails.cn/' },
+    },
+    update: {},
+    create: {
+      categoryId: navCategory.id,
+      title: 'EduMails 学生优惠导航',
+      url: 'https://nav.edumails.cn/',
+      description:
+        '教育邮箱学生优惠导航：JetBrains、GitHub Student Pack、Adobe 等学生权益汇总',
+      sortOrder: 0,
+    },
+  });
+  console.log('Nav seed: 教育优惠 / EduMails 学生优惠导航');
 }
 
 main()

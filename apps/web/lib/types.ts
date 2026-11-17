@@ -123,3 +123,23 @@ export interface PerksListResponse {
   sources: PerkSourceStatus[];
   categories: string[];
 }
+
+export interface NavLink {
+  id: string;
+  categoryId: string;
+  title: string;
+  url: string;
+  description: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NavCategory {
+  id: string;
+  name: string;
+  sortOrder: number;
+  links: NavLink[];
+  createdAt: string;
+  updatedAt: string;
+}

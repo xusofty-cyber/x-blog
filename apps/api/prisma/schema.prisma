@@ -166,3 +166,30 @@ model PerkItem {
   @@index([isBookmarked])
 }
 
+// 网址导航（v1，公开页 /nav）：分类 + 链接两张表，只存标题、地址与简介，
+// 不抓目标站内容；增删改只限管理员后台（JwtAuthGuard），公开读取不限流、不鉴权。
+// 种子带一个默认分类“教育优惠”与 EduMails 学生优惠导航链接。
+model NavCategory {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  sortOrder Int       @default(0)
+  links     NavLink[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model NavLink {
+  id          String      @id @default(uuid())
+  categoryId  String
+  category    NavCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  title       String
+  url         String
+  description String      @default("")
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([categoryId, url])
+  @@index([categoryId, sortOrder])
+}
+
