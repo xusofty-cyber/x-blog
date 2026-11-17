@@ -15,6 +15,7 @@
   4. **Media Upload & Quota Management (`apps/api/src/uploads`, `apps/web/app/admin/media`)**: Authenticated upload/list/delete for images (`png/jpg/jpeg/gif/webp`) and videos (`mp4/webm`) written directly to `UPLOAD_DIR` (`/data/blog-img`, host `/var/www/blog-img`), 100MB per-file Multer limit, configurable total quota (`UPLOAD_TOTAL_LIMIT_MB`, default `5120`).
   5. **Multi-Account Mail Viewer (`apps/api/src/mail`, `apps/web/app/admin/mail`)**: Admin-only on-demand IMAP reader (`imapflow` + `mailparser`) supporting QQ groups (up to 3 aliases: `numeric`, `letter`, `foxmail` sharing one group auth code) and 163 mailboxes (`imap.163.com:993`, 1 mailbox/group), AES-256-GCM encrypted auth codes (`MAIL_ENCRYPTION_KEY`), message list/search/read/delete, attachment download (<= 30MB), and unified recent inbox (`GET /api/mail/recent`) with within-group deduplication (`unified-dedupe.ts`).
   6. **Admin Perks Radar (`apps/api/src/perks`, `apps/web/app/admin/perks`)**: Admin-only deal/freebie aggregator inspired by `luobinger/PerkRadar` (`JwtAuthGuard`, not exposed publicly). Fetches 7 fixed feeds with differential intervals (`fast` 1h: `linuxdo`, `v2ex`, `nodeseek`; `slow` 3h: `epic`, `appinn`, `ghxi`, `iplaysoft`), conditional HTTP (`ETag`/`Last-Modified` 304), `allowedHosts` link filtering, 7-day unbookmarked retention, and PostgreSQL-persisted bookmark/claimed states.
+  7. **URL Navigation (`apps/api/src/nav`, `apps/web/app/nav`, `apps/web/app/admin/nav`)**: Public `/nav` page grouping curated links by category (cards, new-tab links, client-side search filter) backed by `NavCategory` + `NavLink` tables; admin-only CRUD and ordering (`JwtAuthGuard`, `POST /api/nav/...` mutations, `GET /api/nav` public). Seed ships one category (“教育优惠”) with the EduMails student-discount link (`https://nav.edumails.cn/`).
 
 ---
 
@@ -23,7 +24,7 @@
 ### 1. Environment & Branches
 - **Repository**: `git@github.com:xusofty-cyber/x-blog.git`
 - **Primary / Working Branch**: `main` (protected; develop on short-lived feature/fix branches)
-- **Runtime & Deployment**: Docker Compose (`node:22-alpine` multi-stage images) behind host Nginx SSL gateway (`blog.ulife.vip` -> `127.0.0.1:13100`), deployed via GitHub Actions (`.github/workflows/deploy.yml`) + `deploy/deploy.sh` over SSH.
+- **Runtime & Deployment**: Docker Compose (`node:22-alpine` multi-stage images) behind host Nginx SSL gateway (`blog.ulife.vip` -> `127.0.0.1:13100`), deployed via Drone CI auto-deploy on push to `main` (clone at `$HOME/x-blog`, runs `deploy/deploy.sh`) or manual `deploy/deploy.sh` over SSH from the projects clone (`/home/ubuntu/projects/x-blog`). Caution: Drone may fetch the pre-push commit and no-op (seen 2026-11-11 and 2026-11-17); never run a manual deploy while a Drone deploy is in flight — check `ps` first, and verify the deployed HEAD afterwards.
 
 ### 2. Stack Choices
 
@@ -88,3 +89,7 @@
   - **Context**: Integrate `luobinger/PerkRadar` deal aggregation into `x-blog` without adding a separate container/subdomain or exposing unverified third-party feeds publicly.
   - **Decision**: Implement `PerksModule` inside `apps/api` backed by additive Prisma tables (`PerkRound`, `PerkSourceRun`, `PerkSourceState`, `PerkItem`), differential refresh scheduling (1h fast / 3h slow + `ETag`/`Last-Modified`), and JWT-protected `/admin/perks` UI.
   - **Impact**: Single-console admin experience with PostgreSQL-synced bookmarks/claims and zero changes to public blog routes or Nginx config.
+- **2026-11-17**: [URL Navigation Page (`feature/nav-page`, `b0deef5`)]
+  - **Context**: The user wanted a public navigation page on the blog so useful URLs don't have to be remembered, manageable from the admin console; first link seeded is the EduMails student-discount hub (`https://nav.edumails.cn/`).
+  - **Decision**: Two additive Prisma tables (`NavCategory` with unique name, `NavLink` with per-category unique URL, cascade delete), public `GET /api/nav`, JWT-guarded category/link CRUD + up/down ordering in a new `NavModule`; public `/nav` page (server fetch + client search filter) and `/admin/nav` management UI; header “导航” link and sitemap entry.
+  - **Impact**: 11 mail groups grew to 13 on 2026-11-14 (user-added, unrelated); deploy note: the Drone auto-deploy fetched the pre-push commit and no-op'd, so the nav release was deployed manually instead.

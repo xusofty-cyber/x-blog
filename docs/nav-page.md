@@ -35,6 +35,7 @@
 
 ## 部署核对
 
-- 备份：`/home/ubuntu/xblog-backup-20261117-mail-nav.sql`（600）
-- 部署前后一致：11 个分组、28 个邮箱、分组授权码总长度 726；健康 `{"status":"ok"}`；`GET /api/nav` 未登录返回 200（公开接口）；管理接口未登录返回 401；`/nav` 200；部署日志 “Deployment completed successfully”。
+- 备份：`/home/ubuntu/xblog-backup-20261117-mail-nav.sql`（600，404053 字节，部署前做）
+- 部署前后一致：13 个分组、34 个邮箱、分组授权码总长度 858——比 11 月 11 日的 11 组 / 28 邮箱 / 726 多了 2 个分组（2385651823、1458227168，均为 2026-11-14 09:16/09:17 在后台添加，各带 3 个邮箱），与本次部署无关，部署前备份里已有这 2 组；健康 `{"status":"ok"}`；`GET /api/nav` 未登录返回 200（公开接口，返回教育优惠分类 + EduMails 链接 1 条）；管理接口未登录返回 401；`/nav` 200、`/admin/nav` 200；部署日志 “Deployment completed successfully”。
 - 新表核对：`NavCategory` 1 行（教育优惠）、`NavLink` 1 行（nav.edumails.cn）。
+- 本次部署插曲：推送后 Drone 那路自动部署先跑起来，但它取代码时取到了推送前的旧提交（995fc97），等于白跑一趟、线上还是旧版；云舒确认 Drone 进程已退出、无并发后改走手动部署（日志 `deploy-20261117-nav.log`）一次成功。另：部署前发现虚拟机 13:36 又换了一次，`/root/.ssh` 被清空导致 GitHub 与博客服务器 SSH 都不通，按既有恢复流程手动恢复后才推上去（指纹仍为 HdJy…，博客服务器主机密钥因 known_hosts 丢失、用 accept-new 重新接受）。
